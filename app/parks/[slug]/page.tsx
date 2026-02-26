@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
@@ -26,6 +27,9 @@ type DetailPageProps = {
   params: Promise<{ slug: string }>;
 };
 
+const parkSelect =
+  "id, slug, official_name, summary, city_town, status, park_type, operating_hours, street_address, zip_code, website, year_built, park_size_sqft";
+
 function getNames(rows: NameRelationRow[] | null, key: string): string[] {
   if (!rows) return [];
   // Normalize nested relation rows like { features: { name: "..." } } to string[].
@@ -35,12 +39,7 @@ function getNames(rows: NameRelationRow[] | null, key: string): string[] {
     .map((item) => item.name);
 }
 
-export default async function ParkDetailPage({ params }: DetailPageProps) {
-  const { slug } = await params;
-
-  const parkSelect =
-    "id, slug, official_name, summary, city_town, status, park_type, operating_hours, street_address, zip_code, website, year_built, park_size_sqft";
-
+async function getParkBySlug(slug: string): Promise<ParkRow | null> {
   const { data: park, error } = await supabase
     .from("parks")
     .select(parkSelect)
@@ -49,6 +48,57 @@ export default async function ParkDetailPage({ params }: DetailPageProps) {
     .overrideTypes<ParkRow>();
 
   if (error || !park) {
+    return null;
+  }
+
+  return park;
+}
+
+export async function generateMetadata({ params }: DetailPageProps): Promise<Metadata> {
+  const { slug } = await params;
+  const park = await getParkBySlug(slug);
+
+  if (!park) {
+    return {
+      title: "Park Not Found | PA Skate Parks",
+      description: "The requested park could not be found.",
+      robots: {
+        index: false,
+        follow: false,
+      },
+    };
+  }
+
+  const title = `${park.official_name} | PA Skate Parks`;
+  const description =
+    park.summary ??
+    `${park.official_name} skate park in ${park.city_town}, Pennsylvania. View details, features, and local park info.`;
+  const canonicalPath = `/parks/${park.slug}`;
+
+  return {
+    title,
+    description,
+    alternates: {
+      canonical: canonicalPath,
+    },
+    openGraph: {
+      type: "website",
+      title,
+      description,
+      url: canonicalPath,
+    },
+    twitter: {
+      card: "summary",
+      title,
+      description,
+    },
+  };
+}
+
+export default async function ParkDetailPage({ params }: DetailPageProps) {
+  const { slug } = await params;
+  const park = await getParkBySlug(slug);
+  if (!park) {
     notFound();
   }
 
