@@ -6,12 +6,29 @@ type NameRelationRow = {
   [key: string]: { name: string } | null;
 };
 
+type ParkRow = {
+  id: string;
+  slug: string | null;
+  official_name: string;
+  summary: string | null;
+  city_town: string;
+  status: string;
+  park_type: string | null;
+  operating_hours: string | null;
+  street_address: string | null;
+  zip_code: string | null;
+  website: string | null;
+  year_built: number | null;
+  park_size_sqft: number | null;
+};
+
 type DetailPageProps = {
-  params: Promise<{ id: string }>;
+  params: Promise<{ slug: string }>;
 };
 
 function getNames(rows: NameRelationRow[] | null, key: string): string[] {
   if (!rows) return [];
+  // Normalize nested relation rows like { features: { name: "..." } } to string[].
   return rows
     .map((row) => row[key])
     .filter((item): item is { name: string } => Boolean(item))
@@ -19,20 +36,23 @@ function getNames(rows: NameRelationRow[] | null, key: string): string[] {
 }
 
 export default async function ParkDetailPage({ params }: DetailPageProps) {
-  const { id } = await params;
+  const { slug } = await params;
+
+  const parkSelect =
+    "id, slug, official_name, summary, city_town, status, park_type, operating_hours, street_address, zip_code, website, year_built, park_size_sqft";
 
   const { data: park, error } = await supabase
     .from("parks")
-    .select(
-      "id, official_name, summary, city_town, status, park_type, operating_hours, street_address, zip_code, website, year_built, park_size_sqft"
-    )
-    .eq("id", id)
-    .single();
+    .select(parkSelect)
+    .eq("slug", slug)
+    .single()
+    .overrideTypes<ParkRow>();
 
   if (error || !park) {
     notFound();
   }
 
+  // Related data from normalized join/link tables.
   const [
     aliasesRes,
     featuresRes,
@@ -43,34 +63,36 @@ export default async function ParkDetailPage({ params }: DetailPageProps) {
     fundraiserRes,
     facebookRes,
   ] = await Promise.all([
-    supabase.from("park_aliases").select("alias").eq("park_id", id),
+    supabase.from("park_aliases").select("alias").eq("park_id", park.id),
+    // Explicit type overrides keep nested relation types stable in TS/VS Code.
     supabase
       .from("park_features")
       .select("features(name)")
-      .eq("park_id", id)
+      .eq("park_id", park.id)
       .overrideTypes<{ features: { name: string } | null }[]>(),
     supabase
       .from("park_surfaces")
       .select("surfaces(name)")
-      .eq("park_id", id)
+      .eq("park_id", park.id)
       .overrideTypes<{ surfaces: { name: string } | null }[]>(),
     supabase
       .from("park_builders")
       .select("builders(name)")
-      .eq("park_id", id)
+      .eq("park_id", park.id)
       .overrideTypes<{ builders: { name: string } | null }[]>(),
-    supabase.from("park_instagram_handles").select("handle").eq("park_id", id),
+    supabase.from("park_instagram_handles").select("handle").eq("park_id", park.id),
     supabase
       .from("park_youtube_channels")
       .select("channel_url")
-      .eq("park_id", id),
+      .eq("park_id", park.id),
     supabase
       .from("park_fundraiser_links")
       .select("label, url")
-      .eq("park_id", id),
-    supabase.from("park_facebook_pages").select("title, url").eq("park_id", id),
+      .eq("park_id", park.id),
+    supabase.from("park_facebook_pages").select("title, url").eq("park_id", park.id),
   ]);
 
+  // Flatten related result sets for simple display.
   const aliases = (aliasesRes.data ?? []).map((row) => row.alias);
   const features = getNames(featuresRes.data as NameRelationRow[] | null, "features");
   const surfaces = getNames(surfacesRes.data as NameRelationRow[] | null, "surfaces");

@@ -3,15 +3,17 @@ import { supabase } from "@/lib/supabase/client";
 
 type ParkListItem = {
   id: string;
+  slug: string | null;
   official_name: string;
   city_town: string;
   status: string;
 };
 
 export default async function ParksPage() {
+  // Server-side fetch for the park listing page.
   const { data, error } = await supabase
     .from("parks")
-    .select("id, official_name, city_town, status")
+    .select("id, slug, official_name, city_town, status")
     .order("official_name", { ascending: true });
 
   const parks = (data ?? []) as ParkListItem[];
@@ -20,6 +22,7 @@ export default async function ParksPage() {
     <main className="mx-auto w-full max-w-3xl px-6 py-10">
       <h1 className="text-3xl font-bold tracking-tight">Skate Parks</h1>
 
+      {/* Handle fetch error, empty state, and successful list rendering. */}
       {error ? (
         <p className="mt-4 text-sm text-red-700">
           Could not load parks: {error.message}
@@ -31,7 +34,7 @@ export default async function ParksPage() {
           {parks.map((park) => (
             <li key={park.id} className="rounded-lg border p-4">
               <Link
-                href={`/parks/${park.id}`}
+                href={`/parks/${park.slug}`}
                 className="text-lg font-semibold hover:underline"
               >
                 {park.official_name}
