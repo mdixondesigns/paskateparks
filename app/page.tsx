@@ -20,6 +20,12 @@ export default async function HomePage() {
 
   return (
     <main className="mx-auto w-full max-w-3xl px-6 py-10">
+      <iframe
+        src="https://www.google.com/maps/d/u/0/embed?mid=1t83NoK6xt-Cu5Kxm3CEsWcngFFwla5Hn&ehbc=2E312F"
+        width="640"
+        height="480"
+      ></iframe>
+
       <h1 className="text-3xl font-bold tracking-tight">Skate Parks</h1>
 
       {/* Handle fetch error, empty state, and successful list rendering. */}
