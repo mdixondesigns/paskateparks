@@ -1,16 +1,51 @@
 import Link from "next/link";
+import { supabase } from "@/lib/supabase/client";
 
-export default function Home() {
+type ParkListItem = {
+  id: string;
+  slug: string | null;
+  official_name: string;
+  city_town: string;
+  status: string;
+};
+
+export default async function HomePage() {
+  // Server-side fetch for the homepage park listing.
+  const { data, error } = await supabase
+    .from("parks")
+    .select("id, slug, official_name, city_town, status")
+    .order("official_name", { ascending: true });
+
+  const parks = (data ?? []) as ParkListItem[];
+
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-3xl flex-col items-start justify-center gap-4 px-6 py-20">
-      <h1 className="text-4xl font-bold tracking-tight">PA Skate Parks</h1>
-      <p className="text-lg text-neutral-600">Browse and manage parks across Pennsylvania.</p>
-      <Link
-        href="/parks"
-        className="inline-flex rounded-md bg-black px-4 py-2 text-white transition-opacity hover:opacity-85"
-      >
-        View parks
-      </Link>
+    <main className="mx-auto w-full max-w-3xl px-6 py-10">
+      <h1 className="text-3xl font-bold tracking-tight">Skate Parks</h1>
+
+      {/* Handle fetch error, empty state, and successful list rendering. */}
+      {error ? (
+        <p className="mt-4 text-sm text-red-700">
+          Could not load parks: {error.message}
+        </p>
+      ) : parks.length === 0 ? (
+        <p className="mt-4 text-neutral-600">No parks found yet.</p>
+      ) : (
+        <ul className="mt-6 space-y-3">
+          {parks.map((park) => (
+            <li key={park.id} className="rounded-lg border p-4">
+              <Link
+                href={`/parks/${park.slug}`}
+                className="text-lg font-semibold hover:underline"
+              >
+                {park.official_name}
+              </Link>
+              <p className="text-sm text-neutral-600">
+                {park.city_town} · {park.status.replaceAll("_", " ")}
+              </p>
+            </li>
+          ))}
+        </ul>
+      )}
     </main>
   );
 }

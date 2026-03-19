@@ -54,7 +54,9 @@ async function getParkBySlug(slug: string): Promise<ParkRow | null> {
   return park;
 }
 
-export async function generateMetadata({ params }: DetailPageProps): Promise<Metadata> {
+export async function generateMetadata({
+  params,
+}: DetailPageProps): Promise<Metadata> {
   const { slug } = await params;
   const park = await getParkBySlug(slug);
 
@@ -130,7 +132,10 @@ export default async function ParkDetailPage({ params }: DetailPageProps) {
       .select("builders(name)")
       .eq("park_id", park.id)
       .overrideTypes<{ builders: { name: string } | null }[]>(),
-    supabase.from("park_instagram_handles").select("handle").eq("park_id", park.id),
+    supabase
+      .from("park_instagram_handles")
+      .select("handle")
+      .eq("park_id", park.id),
     supabase
       .from("park_youtube_channels")
       .select("channel_url")
@@ -139,27 +144,43 @@ export default async function ParkDetailPage({ params }: DetailPageProps) {
       .from("park_fundraiser_links")
       .select("label, url")
       .eq("park_id", park.id),
-    supabase.from("park_facebook_pages").select("title, url").eq("park_id", park.id),
+    supabase
+      .from("park_facebook_pages")
+      .select("title, url")
+      .eq("park_id", park.id),
   ]);
 
   // Flatten related result sets for simple display.
   const aliases = (aliasesRes.data ?? []).map((row) => row.alias);
-  const features = getNames(featuresRes.data as NameRelationRow[] | null, "features");
-  const surfaces = getNames(surfacesRes.data as NameRelationRow[] | null, "surfaces");
-  const builders = getNames(buildersRes.data as NameRelationRow[] | null, "builders");
+  const features = getNames(
+    featuresRes.data as NameRelationRow[] | null,
+    "features",
+  );
+  const surfaces = getNames(
+    surfacesRes.data as NameRelationRow[] | null,
+    "surfaces",
+  );
+  const builders = getNames(
+    buildersRes.data as NameRelationRow[] | null,
+    "builders",
+  );
 
   return (
     <main className="mx-auto w-full max-w-3xl px-6 py-10">
-      <Link href="/parks" className="text-sm text-neutral-600 hover:underline">
+      <Link href="/" className="text-sm text-neutral-600 hover:underline">
         ← Back to parks
       </Link>
 
-      <h1 className="mt-3 text-3xl font-bold tracking-tight">{park.official_name}</h1>
+      <h1 className="mt-3 text-3xl font-bold tracking-tight">
+        {park.official_name}
+      </h1>
       <p className="mt-1 text-neutral-600">
         {park.city_town} · {park.status.replaceAll("_", " ")}
       </p>
 
-      {park.summary ? <p className="mt-5 whitespace-pre-wrap">{park.summary}</p> : null}
+      {park.summary ? (
+        <p className="mt-5 whitespace-pre-wrap">{park.summary}</p>
+      ) : null}
 
       <section className="mt-8 grid gap-4 text-sm sm:grid-cols-2">
         <p>
@@ -167,10 +188,12 @@ export default async function ParkDetailPage({ params }: DetailPageProps) {
           {park.park_type ? park.park_type.replaceAll("_", " ") : "N/A"}
         </p>
         <p>
-          <span className="font-semibold">Year built:</span> {park.year_built ?? "N/A"}
+          <span className="font-semibold">Year built:</span>{" "}
+          {park.year_built ?? "N/A"}
         </p>
         <p>
-          <span className="font-semibold">Size (sqft):</span> {park.park_size_sqft ?? "N/A"}
+          <span className="font-semibold">Size (sqft):</span>{" "}
+          {park.park_size_sqft ?? "N/A"}
         </p>
         <p>
           <span className="font-semibold">Website:</span>{" "}
@@ -230,7 +253,10 @@ export default async function ParkDetailPage({ params }: DetailPageProps) {
           <ul className="list-disc space-y-1 pl-5">
             {youtubeRes.data.map((item) => (
               <li key={item.channel_url}>
-                <a href={item.channel_url} className="text-blue-700 hover:underline">
+                <a
+                  href={item.channel_url}
+                  className="text-blue-700 hover:underline"
+                >
                   {item.channel_url}
                 </a>
               </li>
