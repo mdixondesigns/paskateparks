@@ -11,6 +11,12 @@ next-env.d.ts
 build/
 dist/
 
+# gstack session state (user-level, never committed)
+.gstack/
+
+# claude (some session files; .claude/settings.local.json is per-user)
+.claude/settings.local.json
+
 # misc
 .DS_Store
 *.pem

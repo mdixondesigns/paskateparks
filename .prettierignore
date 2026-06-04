@@ -1,0 +1,13 @@
+node_modules
+.next
+out
+dist
+build
+coverage
+playwright-report
+test-results
+pnpm-lock.yaml
+*.md
+audit-screenshots
+design-inspiration
+mobile-design
