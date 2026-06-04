@@ -11,12 +11,12 @@ export default defineConfig({
   out: "./supabase/migrations",
   dialect: "postgresql",
   dbCredentials: {
-    // Migrations and introspection use the DIRECT connection. Migrations need
-    // session-level features (CREATE TYPE, ALTER TABLE) that pgbouncer would break.
-    url: process.env.DATABASE_URL ?? "",
+    // drizzle-kit migrate/push/studio use the session-mode pooler (port 5432)
+    // because migrations are DDL (CREATE TYPE, ALTER TABLE) and need session-level
+    // features that transaction-mode pooling would break. Per Supabase's Drizzle
+    // convention, this is DIRECT_URL.
+    url: process.env.DIRECT_URL ?? "",
   },
-  // Use SQL filename pattern compatible with Supabase CLI's migration ordering:
-  // <timestamp>_<name>.sql. drizzle-kit's default works directly with supabase db push.
   casing: "snake_case",
   verbose: true,
   strict: true,

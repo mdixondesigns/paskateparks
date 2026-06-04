@@ -35,19 +35,20 @@ function discoverMigrations(): string[] {
 }
 
 async function main() {
-  const url = process.env.DATABASE_URL;
+  // Migrations run DDL (CREATE TYPE, ALTER TABLE) which requires session-mode.
+  // DIRECT_URL is the session-mode pooler per Supabase's Drizzle/Prisma convention.
+  const url = process.env.DIRECT_URL;
   if (!url) {
     console.error(
-      "ERROR: DATABASE_URL is not set. Copy .env.example to .env.local and fill it in.",
+      "ERROR: DIRECT_URL is not set. Copy .env.example to .env.local and fill it in.",
     );
     process.exit(1);
   }
   if (url.includes("[YOUR-")) {
     console.error(
-      "ERROR: DATABASE_URL still contains placeholder text like [YOUR-PASSWORD] / [YOUR-PROJECT-REF].\n" +
+      "ERROR: DIRECT_URL still contains placeholder text like [YOUR-PASSWORD] / [YOUR-PROJECT-REF].\n" +
         "Open .env.local and paste the real values from your Supabase dashboard:\n" +
-        "  Settings → Database → Connection string → URI (port 5432) — direct\n" +
-        "  Settings → Database → Connection string → Transaction (port 6543) — pooled (add ?pgbouncer=true)",
+        "  Connect → ORM tab → switch to Prisma to see both URLs, copy DIRECT_URL into .env.local",
     );
     process.exit(1);
   }
