@@ -42,7 +42,7 @@ Stack locked in D11 + E1-E6: Vitest (unit) + Playwright (E2E) + MSW (Supabase/Tu
 - Suggestion submitted with honeypot field populated → returns 200 silently, no `suggestions` row
 - Suggestion submitted without Turnstile token → 400
 - 6th suggestion from same IP in 1hr → 429
-- Suggestion submitted directly to Supabase using anon key (bypass attempt) → RLS denies, returns 401/403
+- Suggestion submitted directly to Supabase using publishable key (`sb_publishable_*`, anon-role bound — bypass attempt) → RLS denies, returns 401/403
 - Park slug with non-ASCII characters → URL encoding correct, sitemap entry correct
 - `storage_path` references missing file in Supabase Storage → fallback to branded gradient hero (D13), log warning at build
 - Webhook fires but `/api/revalidate` returns 5xx → Supabase retries automatically (E6); /admin/lint shows stale timestamp
