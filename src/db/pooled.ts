@@ -6,17 +6,21 @@ import postgres from "postgres";
 import { dbEnv } from "./env";
 import * as schema from "./schema";
 
-// Pooled Postgres client. Use from:
+// Pooled client — uses Supabase's TRANSACTION-mode pooler (port 6543).
+// Each query holds a connection only during a single SQL transaction, then
+// returns it to the pool. Many serverless requests share a small handful of
+// underlying Postgres connections — essential for surviving cold-start fanout.
+//
+// Use from:
 //   • /api/* serverless functions
 //   • Anything in the Vercel serverless runtime
-//   • Anything that runs under cold-start fanout
 //
-// CRITICAL (A1, STACK-PIVOT.md finding #5): `prepare: false` is required because
-// Supabase's pooler runs PgBouncer in transaction mode, which can't reuse prepared
+// CRITICAL (A1, STACK-PIVOT.md finding #5): `prepare: false` is required.
+// Supavisor in transaction mode (like PgBouncer) cannot reuse prepared
 // statements between connections. Without this flag you get
-// `prepared statement "X" already exists` / `does not exist` errors under load.
+// `prepared statement "X" already exists` / `does not exist` under load.
 
-const pooledClient = postgres(dbEnv.DATABASE_POOL_URL, {
+const pooledClient = postgres(dbEnv.DATABASE_URL, {
   prepare: false,
   max: 10,
   idle_timeout: 20,
