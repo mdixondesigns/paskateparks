@@ -4,10 +4,15 @@
 --
 -- Posture (per STACK-PIVOT.md, refined by A8 trim):
 --   • Every public-schema table has RLS enabled — defense-in-depth so any future
---     anon-key client read fails instead of leaking data.
---   • No anon-facing policies anywhere. anon role has zero access by default.
---   • service_role bypasses RLS automatically — used by Drizzle clients at
---     build-time (RSC) and in serverless API routes via SUPABASE_SERVICE_ROLE_KEY.
+--     publishable-key client read fails instead of leaking data.
+--   • No anon-facing policies anywhere. The `anon` Postgres role has zero access
+--     by default. (Note: `anon` is the *role*; the *key* that maps to it is
+--     called the publishable key in Supabase's new API key system,
+--     `sb_publishable_*`, replacing the legacy `anon` key.)
+--   • The `service_role` Postgres role bypasses RLS automatically — used by
+--     Drizzle clients at build-time (RSC) and in serverless API routes via the
+--     secret key (`SUPABASE_SECRET_KEY`, `sb_secret_*`, replaces the legacy
+--     service_role key).
 --   • Suggestions WITH CHECK on park_id existence (per STACK-PIVOT.md finding #15)
 --     is enforced by the FOREIGN KEY constraint on suggestions.park_id → parks.id
 --     that Drizzle generated — same guarantee, simpler.

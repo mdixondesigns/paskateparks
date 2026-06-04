@@ -32,7 +32,7 @@ Supabase + Vercel + Drizzle is the standard modern Next.js content-site stack. M
 | Image resize | Pre-resize at migration via Sharp (F2 — reverses E2) | Avoids Vercel Image transformation cap; reliable + $0 | $0 |
 | Admin UI | Supabase Studio | Browser table editor, login-protected, drag-drop photo upload | $0 |
 | Revalidation | Supabase Database Webhooks (E6) | Fire on INSERT/UPDATE/DELETE, built-in retry, POST to /api/revalidate | $0 |
-| Suggestions | Vercel API route + service-role key + RLS deny-all-anon (E5) | Keep Turnstile + Upstash + honeypot in TypeScript, defense-in-depth via RLS | $0 (Upstash + Turnstile free tiers) |
+| Suggestions | Vercel API route + secret key (`sb_secret_*`) + RLS deny-all-anon (E5) | Keep Turnstile + Upstash + honeypot in TypeScript, defense-in-depth via RLS | $0 (Upstash + Turnstile free tiers) |
 | Map | Leaflet + Leaflet.markercluster (D12 carries) | OpenStreetMap tiles, no API key | $0 |
 | Analytics | GA4 + cookie consent banner (D16 carries) | Free, requires banner | $0 |
 | Domain | paskateparks.com (existing) | — | ~$15/yr (existing) |
@@ -286,7 +286,7 @@ jobs:
     steps:
       - run: |
           curl -fsS "https://${{ secrets.SUPABASE_HOST }}/rest/v1/parks?select=id&limit=1" \
-            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}"
+            -H "apikey: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}"
 ```
 Both dev and prod projects pinged. Failure → GitHub sends email. ~10 seconds, $0.
 
@@ -377,7 +377,7 @@ Both dev and prod projects pinged. Failure → GitHub sends email. ~10 seconds, 
 | D7 | Lenient parsers + /admin/lint | RETIRED for parsers. /admin/lint stays for the D18 dashboard. Structured tables replace text fields. |
 | D8 | Photos paginated fetch strategy | RETIRED. SQL JOIN at build. |
 | D9 | Flat 21-field amenity model | RETIRED. Replaced by E4 `park_amenities` child table. |
-| D10 | Two Airtable bases + scoped PATs | RETIRED. Replaced by two Supabase projects (dev + prod, free tier allows it) + Supabase service-role / anon key model + RLS. |
+| D10 | Two Airtable bases + scoped PATs | RETIRED. Replaced by two Supabase projects (dev + prod, free tier allows it) + Supabase secret / publishable key model (`sb_secret_*` / `sb_publishable_*` — the new API key system, replaces legacy anon/service_role keys) + RLS. |
 | D14 | Airtable retry wrapper | RETIRED. Postgres has no rate limit. |
 | D15 | Single-pass migration ordering | SIMPLIFIED. Sharp resize + Supabase Storage upload + Postgres INSERT happen in one script with no inter-system race. |
 
@@ -389,7 +389,7 @@ Both dev and prod projects pinged. Failure → GitHub sends email. ~10 seconds, 
 | ~~E2~~ | ~~Image resize~~ | **REVERSED by F2** — see below. |
 | E3 | Data layer | Drizzle ORM + Supabase CLI migrations. |
 | E4 | Amenity model | `park_amenities` child table with enum type. |
-| E5 | Suggestions write | Vercel API route + service-role key + RLS deny-all-anon. **Amended 2026-06-03 by /plan-eng-review (A8):** v1 ships with honeypot + RLS WITH CHECK only. Turnstile + Upstash deferred to v1.1 with trigger: ≥10 obvious-spam rows in `suggestions` within any rolling 7-day window. Rationale: 150-record directory, expected low submission volume, 3rd-party signup overhead unjustified at v1 scale, iOS Safari Turnstile+keyboard interaction (TODOS.md P2) avoidable for v1. |
+| E5 | Suggestions write | Vercel API route + secret key (`sb_secret_*`) + RLS deny-all-anon. **Amended 2026-06-03 by /plan-eng-review (A8):** v1 ships with honeypot + RLS WITH CHECK only. Turnstile + Upstash deferred to v1.1 with trigger: ≥10 obvious-spam rows in `suggestions` within any rolling 7-day window. Rationale: 150-record directory, expected low submission volume, 3rd-party signup overhead unjustified at v1 scale, iOS Safari Turnstile+keyboard interaction (TODOS.md P2) avoidable for v1. **Amended 2026-06-03 (API key migration):** "secret key" / "publishable key" naming reflects Supabase's new API key system (`sb_secret_*` / `sb_publishable_*`) replacing the legacy anon / service_role keys. Legacy keys work through end of 2026 but can no longer be rotated. The Postgres *roles* `anon` and `service_role` remain — only the keys' user-facing names changed. |
 | E6 | Revalidate trigger | Supabase Database Webhooks → /api/revalidate (with built-in retry). |
 | F1 | Free-tier pause prevention | GitHub Actions daily `SELECT 1` keepalive (both dev + prod). |
 | F2 | Image resize (replaces E2) | Pre-resize at migration via Sharp to 3 sizes (400w/800w/1200w WebP), upload all to Supabase Storage, serve directly via `<picture><source srcset>`. No Vercel Image dependency. |

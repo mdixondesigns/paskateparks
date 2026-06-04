@@ -102,11 +102,11 @@ Captured by /plan-eng-review on 2026-05-30. Items the eng review surfaced but ex
 **Context:** Step-by-step in the project README. Pair-screen with the owner during launch prep to walk through it.
 
 ### Supabase RLS audit before launch
-**What:** Before flipping DNS, manually verify that the Supabase anon key cannot read or write any table except INSERT into `suggestions`. Run a script that exercises every table from a fresh anon client and asserts the expected error.
+**What:** Before flipping DNS, manually verify that the Supabase publishable key (`sb_publishable_*`) cannot read or write any table except INSERT into `suggestions`. Run a script that exercises every table from a fresh anon-role client and asserts the expected error.
 **Why:** RLS misconfiguration is the most common Supabase security incident. The defense-in-depth in E5 only works if it's actually configured.
-**Pros:** Prevents the class of bug where the whole site's user emails leak via the anon key.
+**Pros:** Prevents the class of bug where the whole site's user emails leak via the publishable key.
 **Cons:** ~1 hour of test-writing.
-**Context:** Should run in CI nightly post-launch too. Worth a Playwright test that grabs `NEXT_PUBLIC_SUPABASE_ANON_KEY` and tries every table.
+**Context:** Should run in CI nightly post-launch too. Worth a Playwright test that grabs `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` and tries every table.
 
 ### Vercel Hobby commercial-use risk documentation
 **What:** Document the decision to use Vercel Hobby (E1) despite the commercial-use clause (paskateparks.com funnels to coaching business). Plan: if Vercel ever asks, upgrade to Pro $20/mo (~$240/yr — still cheaper than the old WP setup).
