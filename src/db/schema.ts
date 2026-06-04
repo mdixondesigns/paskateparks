@@ -1,0 +1,305 @@
+// Postgres schema for paskateparks.com.
+// Canonical: STACK-PIVOT.md §"Final schema (Postgres)". This file is the source
+// of truth per A7 (plan-eng-review 2026-06-03) — Drizzle Kit generates SQL into
+// supabase/migrations/, applied via `supabase db push` (or drizzle-kit migrate).
+//
+// Any schema change goes through this file. Run `pnpm drizzle:generate` after.
+
+import {
+  boolean,
+  cidr,
+  doublePrecision,
+  index,
+  integer,
+  pgEnum,
+  pgTable,
+  primaryKey,
+  serial,
+  text,
+  timestamp,
+  uniqueIndex,
+  date,
+} from "drizzle-orm/pg-core";
+
+// ── Enums ────────────────────────────────────────────────────────────────────
+
+export const parkStatus = pgEnum("park_status", [
+  "open",
+  "temporarily_closed",
+  "permanently_closed",
+]);
+
+export const parkType = pgEnum("park_type", [
+  "concrete_park",
+  "diy_park",
+  "indoor_park",
+  "prefab_park",
+  "skate_plaza",
+]);
+
+export const helmetsPolicy = pgEnum("helmets_policy", [
+  "none_posted",
+  "recommended",
+  "required_under_12",
+  "required_all_ages",
+]);
+
+export const ridingSurface = pgEnum("riding_surface", [
+  "concrete",
+  "asphalt",
+  "wood",
+  "other",
+]);
+
+export const linkType = pgEnum("link_type", [
+  "website",
+  "instagram",
+  "facebook",
+  "twitter",
+  "youtube",
+  "tiktok",
+  "gofundme",
+  "venmo",
+  "patreon",
+  "donate",
+  "givebutter",
+  "paypal",
+  "other",
+]);
+
+export const amenityType = pgEnum("amenity_type", [
+  "bathroom",
+  "drinking_water",
+  "lights",
+  "parking",
+  "spectator_area",
+  "onsite_shop",
+  "equipment_rentals",
+]);
+
+// 38 obstacles from WP taxonomy. Enum (not TEXT) prevents typo-driven silent
+// new obstacles in Studio. Adding a new obstacle = ALTER TYPE ADD VALUE migration.
+export const obstacleType = pgEnum("obstacle_type", [
+  "grind_box_ledge",
+  "quarter_pipe",
+  "flat_rail",
+  "bank_wedge",
+  "hubba",
+  "manual_pad",
+  "funbox",
+  "hip",
+  "handrail",
+  "curb",
+  "pyramid",
+  "kicker_launch_ramp",
+  "stair",
+  "wallride",
+  "mini_ramp",
+  "spine",
+  "euro_london_gap",
+  "pool_bowl",
+  "extension",
+  "gap",
+  "roll_in",
+  "volcano",
+  "jersey_barrier",
+  "a_frame",
+  "amoeba_pool",
+  "box_jump",
+  "picnic_table",
+  "pole",
+  "rainbow_rail",
+  "escalator",
+  "full_pipe",
+  "cradle_over_vert",
+  "snake_run",
+  "fire_hydrant",
+  "whoop_dee_doo",
+  "foam_pit",
+  "mega_ramp",
+  "pump_track",
+]);
+
+// ── Core tables ──────────────────────────────────────────────────────────────
+
+export const parks = pgTable(
+  "parks",
+  {
+    id: serial("id").primaryKey(),
+    slug: text("slug").notNull().unique(),
+    name: text("name").notNull(),
+    status: parkStatus("status").notNull().default("open"),
+    city: text("city").notNull(),
+    state: text("state").notNull().default("PA"),
+    establishedYear: integer("established_year"),
+    parkType: parkType("park_type"),
+    squareFootage: integer("square_footage"),
+    county: text("county"),
+    streetAddress: text("street_address"),
+    zip: text("zip"),
+    // lat/lng nullable: 99 stub parks don't have coords yet. Render-time:
+    // NULL coords → excluded from /map/ + Nearby compute, profile still renders.
+    lat: doublePrecision("lat"),
+    lng: doublePrecision("lng"),
+    hours: text("hours"),
+    description: text("description"),
+    allowsSkateboards: boolean("allows_skateboards").notNull().default(true),
+    allowsBikes: boolean("allows_bikes").notNull().default(true),
+    allowsRollerSkates: boolean("allows_roller_skates").notNull().default(true),
+    allowsScooters: boolean("allows_scooters").notNull().default(true),
+    vehicleRulesNotes: text("vehicle_rules_notes"),
+    helmets: helmetsPolicy("helmets").default("none_posted"),
+    otherPadsRequired: boolean("other_pads_required").default(false),
+    fee: boolean("fee").default(false),
+    programming: boolean("programming").default(false),
+    ridingSurfaceNotes: text("riding_surface_notes"),
+    ridingSurfacePhotoPath: text("riding_surface_photo_path"),
+    // temporarily_closed reopen tracking — stale banners would erode trust.
+    statusChangedAt: timestamp("status_changed_at", { withTimezone: true }),
+    reopenExpectedAt: date("reopen_expected_at"),
+    // Migration idempotency key (phase 5). UNIQUE so ON CONFLICT works.
+    wpPostId: integer("wp_post_id").unique(),
+    // D18 observability — when did /api/revalidate last touch this slug?
+    lastRevalidatedAt: timestamp("last_revalidated_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("parks_slug_idx").on(t.slug)],
+);
+
+export const parkRenovations = pgTable("park_renovations", {
+  id: serial("id").primaryKey(),
+  parkId: integer("park_id")
+    .notNull()
+    .references(() => parks.id, { onDelete: "cascade" }),
+  year: integer("year").notNull(),
+  notes: text("notes"),
+  sortOrder: integer("sort_order").notNull().default(0),
+});
+
+export const parkRidingSurfaces = pgTable(
+  "park_riding_surfaces",
+  {
+    parkId: integer("park_id")
+      .notNull()
+      .references(() => parks.id, { onDelete: "cascade" }),
+    surface: ridingSurface("surface").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.parkId, t.surface] })],
+);
+
+export const parkObstacles = pgTable(
+  "park_obstacles",
+  {
+    parkId: integer("park_id")
+      .notNull()
+      .references(() => parks.id, { onDelete: "cascade" }),
+    obstacle: obstacleType("obstacle").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.parkId, t.obstacle] })],
+);
+
+// E4 — universal amenity model as child table, not 21-flat-column model.
+export const parkAmenities = pgTable(
+  "park_amenities",
+  {
+    parkId: integer("park_id")
+      .notNull()
+      .references(() => parks.id, { onDelete: "cascade" }),
+    type: amenityType("type").notNull(),
+    present: boolean("present").notNull().default(false),
+    notes: text("notes"),
+    photoPath: text("photo_path"),
+  },
+  (t) => [
+    primaryKey({ columns: [t.parkId, t.type] }),
+    index("park_amenities_park_idx").on(t.parkId),
+  ],
+);
+
+// Replaces D7 free-text ParkLinks parser — structured rows, renderer dispatches by `type`.
+export const parkLinks = pgTable(
+  "park_links",
+  {
+    id: serial("id").primaryKey(),
+    parkId: integer("park_id")
+      .notNull()
+      .references(() => parks.id, { onDelete: "cascade" }),
+    type: linkType("type").notNull(),
+    url: text("url").notNull(),
+    label: text("label"), // e.g. "@fdrskatepark"
+    sortOrder: integer("sort_order").notNull().default(0),
+  },
+  (t) => [index("park_links_park_idx").on(t.parkId, t.sortOrder)],
+);
+
+export const builders = pgTable("builders", {
+  id: serial("id").primaryKey(),
+  // UNIQUE — prevents duplicate "DIY" / "Spohn Ranch" silent inserts. Migration
+  // normalizes names (trim, casefold-compare) before insert per A3.
+  name: text("name").notNull().unique(),
+  url: text("url"),
+  logoPath: text("logo_path"),
+  wpPostId: integer("wp_post_id").unique(),
+});
+
+export const parkBuilders = pgTable(
+  "park_builders",
+  {
+    parkId: integer("park_id")
+      .notNull()
+      .references(() => parks.id, { onDelete: "cascade" }),
+    builderId: integer("builder_id")
+      .notNull()
+      .references(() => builders.id, { onDelete: "restrict" }),
+    sortOrder: integer("sort_order").notNull().default(0),
+  },
+  (t) => [primaryKey({ columns: [t.parkId, t.builderId] })],
+);
+
+export const shops = pgTable("shops", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  url: text("url"),
+  logoPath: text("logo_path"),
+  address: text("address"),
+  lat: doublePrecision("lat").notNull(),
+  lng: doublePrecision("lng").notNull(),
+  state: text("state").notNull().default("PA"),
+  wpPostId: integer("wp_post_id").unique(),
+});
+
+// D29 child table — replaces multi-attachment field on Parks for forward
+// contributor credits.
+export const parkPhotos = pgTable(
+  "park_photos",
+  {
+    id: serial("id").primaryKey(),
+    parkId: integer("park_id")
+      .notNull()
+      .references(() => parks.id, { onDelete: "cascade" }),
+    // e.g. 'parks/fdr/photo-01' — the renderer appends @{400,800,1200}w.webp.
+    storagePath: text("storage_path").notNull(),
+    credit: text("credit"),
+    caption: text("caption"),
+    altText: text("alt_text"), // TODOS.md P1 — owner backfills
+    sortOrder: integer("sort_order").notNull().default(0),
+  },
+  (t) => [index("park_photos_park_idx").on(t.parkId, t.sortOrder)],
+);
+
+export const suggestions = pgTable("suggestions", {
+  id: serial("id").primaryKey(),
+  parkId: integer("park_id")
+    .notNull()
+    .references(() => parks.id, { onDelete: "restrict" }),
+  submitterName: text("submitter_name"),
+  submitterEmail: text("submitter_email"),
+  changeDescription: text("change_description").notNull(),
+  reason: text("reason"),
+  status: text("status").notNull().default("new"), // new | in_review | applied | rejected
+  // /24-truncated CIDR (not raw INET) — PII reduction per STACK-PIVOT.md finding #11.
+  // API route runs `inet '192.168.1.5' & inet '255.255.255.0'` before insert.
+  submitterIpTruncated: cidr("submitter_ip_truncated"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
