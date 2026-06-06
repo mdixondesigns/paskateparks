@@ -23,8 +23,8 @@ describe("StatusBanner — D11 conditional rendering", () => {
     render(
       <StatusBanner
         status="temporarily_closed"
-        // The schema's `date` column comes back as a string at runtime; mirror that.
-        reopenExpectedAt={"2026-08-15" as unknown as Date}
+        // The schema's `date` column comes back as a string at runtime.
+        reopenExpectedAt="2026-08-15"
       />,
     );
     expect(screen.getByRole("alert")).toHaveTextContent(/2026-08-15/);

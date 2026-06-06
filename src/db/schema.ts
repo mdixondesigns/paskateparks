@@ -278,7 +278,8 @@ export const parkPhotos = pgTable(
     parkId: integer("park_id")
       .notNull()
       .references(() => parks.id, { onDelete: "cascade" }),
-    // e.g. 'parks/fdr/photo-01' — the renderer appends @{400,800,1200}w.webp.
+    // e.g. 'parks/fdr/photo-01' — the renderer appends @{400,800,1200}w.jpg.
+    // (Originally WebP per F2 spec; amended to JPEG in phase 5 for shareability.)
     storagePath: text("storage_path").notNull(),
     credit: text("credit"),
     caption: text("caption"),

@@ -13,7 +13,10 @@ export default defineConfig({
     environment: "happy-dom",
     globals: true,
     setupFiles: ["./vitest.setup.ts"],
-    include: ["src/**/*.{test,spec}.{ts,tsx}"],
+    include: [
+      "src/**/*.{test,spec}.{ts,tsx}",
+      "scripts/**/*.{test,spec}.ts", // phase 5 wp-migration parser unit tests
+    ],
     exclude: ["node_modules/**", ".next/**", "e2e/**"],
     css: false,
   },
