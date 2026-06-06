@@ -25,15 +25,20 @@
     "db:migrate:dry-run": "tsx scripts/db-migrate.ts --dry-run",
     "db:verify": "tsx scripts/db-verify.ts",
     "db:seed-fdr": "tsx scripts/db-seed-fdr.ts",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "migrate-wp": "tsx scripts/migrate-wp.ts",
+    "migrate-wp:dry-run": "tsx scripts/migrate-wp.ts --dry-run"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.107.0",
     "drizzle-orm": "^0.45.2",
     "next": "^16.2.7",
+    "php-serialize": "^5.1.3",
     "postgres": "^3.4.9",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "server-only": "^0.0.1"
+    "server-only": "^0.0.1",
+    "sharp": "^0.34.5"
   },
   "devDependencies": {
     "@playwright/test": "^1.60.0",

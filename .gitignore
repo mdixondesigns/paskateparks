@@ -54,3 +54,7 @@ playwright/.cache/
 
 # os
 Thumbs.db
+
+# WP migration source data — contains PII (emails, IPs, etc.) from WP comments/users.
+# Phase 5 reads this; never commit.
+data/

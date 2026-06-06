@@ -20,7 +20,7 @@ export function SuggestEditButton({ parkSlug, parkName }: Props) {
         data-park-slug={parkSlug}
         className="block w-full rounded border px-4 py-3 text-left"
       >
-        Suggest an edit →
+       Know this park? Suggest an edit →
       </button>
     </section>
   );
