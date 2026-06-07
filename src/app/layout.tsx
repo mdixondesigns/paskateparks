@@ -2,10 +2,12 @@ import "./globals.css";
 
 import type { Metadata } from "next";
 
+import { Footer } from "@/components/home/Footer";
+
 export const metadata: Metadata = {
-  // Phase-1 placeholder. Real metadata (title template, OG image, canonical) lands
-  // in phase 4 once we have park profiles, and in phase 6 once the homepage copy
-  // is finalized per VISUAL-DESIGN.md §16.
+  // Per-route titles override via `metadata` exports (homepage in src/app/page.tsx,
+  // park profile in src/app/park/[slug]/page.tsx). Full SEO metadata pass
+  // (OG image, JSON-LD ItemList, canonical) deferred to a later TODO.
   title: "Pennsylvania Skateparks",
   description: "A directory of skateparks across Pennsylvania.",
 };
@@ -26,6 +28,7 @@ export default function RootLayout({
           Skip to main content
         </a>
         {children}
+        <Footer />
       </body>
     </html>
   );

@@ -1,18 +1,87 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
+
+// Phase 6 homepage RSC integration test. The Page itself is an async server
+// component — Vitest can render it by awaiting the returned JSX (Next 16 +
+// React 19 supports this in the test env so long as the data layer is mocked).
+//
+// The vi.mock factory below is hoisted by Vitest above the static `import Home`
+// at the top of the file, so the imported module already sees the mocked
+// getAllParksForHomepage by the time Home() executes.
+
+vi.mock("@/lib/park-query", () => ({
+  getAllParksForHomepage: vi.fn(async () => [
+    {
+      id: 1,
+      slug: "fdr",
+      name: "FDR Skatepark",
+      city: "Philadelphia",
+      state: "PA",
+      lat: 39.91,
+      lng: -75.18,
+      heroPhotoPath: "parks/fdr/photo-01",
+    },
+    {
+      id: 2,
+      slug: "bayne-skatepark",
+      name: "Bayne Skatepark",
+      city: "Bellevue",
+      state: "PA",
+      lat: 40.5,
+      lng: -80.05,
+      heroPhotoPath: null,
+    },
+  ]),
+}));
+
 import Home from "./page";
 
-describe("Phase 1 scaffold — homepage placeholder", () => {
-  it("renders the page heading", () => {
-    render(<Home />);
+beforeEach(() => {
+  // Stub scrollIntoView via spyOn so afterEach can restore the prototype
+  // cleanly. Plain assignment would leak the mock across test files.
+  vi.spyOn(Element.prototype, "scrollIntoView").mockImplementation(() => {});
+  // happy-dom doesn't ship navigator.geolocation by default. Stub it so the
+  // client-island NearMeButton's feature detect passes and the button renders.
+  vi.stubGlobal("navigator", {
+    ...globalThis.navigator,
+    geolocation: { getCurrentPosition: vi.fn() },
+  });
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+});
+
+describe("Phase 6 homepage", () => {
+  it("renders the hero copy and an h1", async () => {
+    render(await Home());
     expect(
-      screen.getByRole("heading", { level: 1, name: /Pennsylvania Skateparks/i }),
+      screen.getByRole("heading", { level: 1, name: /pennsylvania skateparks/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/directory of public skateparks across pennsylvania/i),
     ).toBeInTheDocument();
   });
 
-  it("renders inside a <main> landmark with id 'main' (skip-link target)", () => {
-    const { container } = render(<Home />);
-    const main = container.querySelector("main#main");
-    expect(main).not.toBeNull();
+  it("renders the <main id='main'> landmark (skip-link target)", async () => {
+    const { container } = render(await Home());
+    expect(container.querySelector("main#main")).not.toBeNull();
+  });
+
+  it("renders every park's name in the initial HTML (SEO bet per D19)", async () => {
+    render(await Home());
+    expect(screen.getByText("FDR Skatepark")).toBeInTheDocument();
+    expect(screen.getByText("Bayne Skatepark")).toBeInTheDocument();
+  });
+
+  it("includes a Find parks near me button (geolocation entry)", async () => {
+    render(await Home());
+    expect(screen.getByRole("button", { name: /find parks near me/i })).toBeInTheDocument();
+  });
+
+  it("includes a filter input", async () => {
+    render(await Home());
+    expect(screen.getByPlaceholderText(/filter by name or city/i)).toBeInTheDocument();
   });
 });

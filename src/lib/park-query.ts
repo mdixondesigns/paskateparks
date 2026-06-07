@@ -1,6 +1,6 @@
 import "server-only";
 
-import { asc, eq, ne, isNotNull, and } from "drizzle-orm";
+import { asc, eq, ne, isNotNull, and, inArray } from "drizzle-orm";
 
 import { db } from "@/db/client";
 import {
@@ -119,18 +119,96 @@ export async function getAllShopsForNearby() {
     .from(shops);
 }
 
-/** Hero photo + the first photo of every park — used for Nearby card thumbnails. */
+/**
+ * Hero photo (sort_order = lowest) per park, for the requested park ids.
+ * Used as the thumbnail on NearbyCard rows on both /park/<slug> and / .
+ *
+ * Indexed only on the rows we asked for via WHERE inArray — earlier versions
+ * SELECT'd every park_photos row and filtered in Node with includes(), which
+ * was O(n*m). The homepage now passes every park id, so the WHERE keeps it
+ * O(rows-returned).
+ */
 export async function getHeroPhotoFor(parkIds: readonly number[]): Promise<Map<number, string>> {
   if (parkIds.length === 0) return new Map();
   const rows = await db
-    .select({ parkId: parkPhotos.parkId, storagePath: parkPhotos.storagePath, sortOrder: parkPhotos.sortOrder })
+    .select({ parkId: parkPhotos.parkId, storagePath: parkPhotos.storagePath })
     .from(parkPhotos)
+    .where(inArray(parkPhotos.parkId, [...parkIds]))
     .orderBy(asc(parkPhotos.parkId), asc(parkPhotos.sortOrder));
   const map = new Map<number, string>();
   for (const row of rows) {
-    if (parkIds.includes(row.parkId) && !map.has(row.parkId)) {
+    if (!map.has(row.parkId)) {
       map.set(row.parkId, row.storagePath);
     }
   }
   return map;
+}
+
+/**
+ * Homepage row — what the / list-first view (phase 6, D6) needs to render a
+ * card without re-fetching on the client. Sorted alphabetically by name; client
+ * island re-sorts by Haversine distance once the user grants geolocation.
+ *
+ *   ┌─ getAllParksForHomepage ─────────────────────────────────────┐
+ *   │                                                              │
+ *   │   parks ─────────────┐                                       │
+ *   │     (alpha by name)  │                                       │
+ *   │                      ▼                                       │
+ *   │   getHeroPhotoFor(ids) ──► Map<parkId,storagePath>           │
+ *   │                      │                                       │
+ *   │                      ▼                                       │
+ *   │   HomeParkRow[] ── serialized as <HomeParkList> prop         │
+ *   │                                                              │
+ *   └──────────────────────────────────────────────────────────────┘
+ *
+ * Build-time only. Phase 9 webhook revalidation rebuilds when the parks table
+ * changes. Parks with NULL lat/lng are included (filter-only fallback still
+ * works) but get excluded from distance sort on the client (per nearby.ts).
+ */
+export interface HomeParkRow {
+  id: number;
+  slug: string;
+  name: string;
+  city: string;
+  state: string;
+  lat: number | null;
+  lng: number | null;
+  heroPhotoPath: string | null;
+}
+
+// Soft tripwire — TODOS.md P2 ("Homepage scaling breakpoint"). At ~7KB/park
+// client serialization, 200 rows = ~1.4MB above-the-fold which starts hurting
+// cold LCP. Warn loudly at build so we don't ship past the line silently.
+const HOMEPAGE_SCALE_WARN_THRESHOLD = 200;
+
+export async function getAllParksForHomepage(): Promise<HomeParkRow[]> {
+  // Exclude temporarily_closed + permanently_closed parks from the homepage —
+  // a parent in a parking lot ranking a closed park as "nearest" is exactly
+  // the P0 trust failure D11 was meant to prevent. Closed park profile pages
+  // still render at /park/<slug> as historical record; they're just not
+  // promoted on discovery surfaces. When `status` flips back to 'open' the
+  // phase 9 webhook revalidates this route and the park reappears.
+  const rows = await db
+    .select({
+      id: parks.id,
+      slug: parks.slug,
+      name: parks.name,
+      city: parks.city,
+      state: parks.state,
+      lat: parks.lat,
+      lng: parks.lng,
+    })
+    .from(parks)
+    .where(eq(parks.status, "open"))
+    .orderBy(asc(parks.name));
+
+  if (rows.length > HOMEPAGE_SCALE_WARN_THRESHOLD) {
+    console.warn(
+      `[getAllParksForHomepage] ${rows.length} parks exceeds ${HOMEPAGE_SCALE_WARN_THRESHOLD}-row threshold — ` +
+        `client-serialize+sort model starts hurting cold LCP. See TODOS.md "Homepage scaling breakpoint".`,
+    );
+  }
+
+  const heroPhotos = await getHeroPhotoFor(rows.map((r) => r.id));
+  return rows.map((r) => ({ ...r, heroPhotoPath: heroPhotos.get(r.id) ?? null }));
 }

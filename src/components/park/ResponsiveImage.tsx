@@ -53,6 +53,7 @@ export function ResponsiveImage({
   // srcset selection will override on render based on viewport.
   const fallback = buildUrl(storagePath, 800);
   return (
+    // eslint-disable-next-line @next/next/no-img-element -- deliberate per STACK-PIVOT.md F2: pre-resized Supabase JPEGs served via plain <img srcset>, NOT next/image.
     <img
       src={fallback}
       srcSet={srcset}
