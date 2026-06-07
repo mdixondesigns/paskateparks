@@ -52,6 +52,14 @@ Captured by /plan-eng-review on 2026-05-30. Items the eng review surfaced but ex
 **Context:** Tied to A2 (plan-eng-review 2026-06-03). Phase 1 scaffolds the helper; phase 5 migration populates parks; subsequent builds emit correct redirects. Add a test that asserts every `parks.slug` has a corresponding redirect entry at build time.
 **Depends on:** Phase 2 (Supabase + Drizzle) before generation can work; until then, hardcode the 47 in next.config.ts.
 
+### NearMeButton CLS — reserve placeholder slot
+**What:** `src/components/home/NearMeButton.tsx` returns `null` on SSR (feature-detect lives in `useEffect`), then renders the real button after hydration. The filter-input row in `HomeParkList` reflows mid-paint — a visible CLS hit on the parking-lot 4G P0 case. Fix: render a fixed-width placeholder (`visibility: hidden`) sized to the longest label ("Find parks near me") during the unsupported / pre-hydration window, swap in the real button when `supported` flips true.
+**Why:** Core Web Vitals (CLS) and perceived stability on the headline use case. Surfaced by the /codex performance specialist during phase 6 pre-landing review.
+**Pros:** ~10 LOC. Real perceived-perf win. Doesn't affect SEO or behavior on supported browsers.
+**Cons:** Touches a component that already passed its review — small re-test surface.
+**Context:** Phase 6 D2 chose a single client island that gates the button on `useEffect(() => navigator.geolocation && setSupported(true), [])`. The slot reservation is independent of that gate.
+**Depends on:** Nothing.
+
 ### Search Console + measurement plan
 **What:** Add to launch checklist: verify domain in Search Console, baseline rankings for primary queries ('PA skateparks', '[city] skatepark', '[county] skateparks PA'), set weekly tracking, plus GA4/Plausible analytics setup decision (per D16).
 **Why:** D6 list-first homepage is an SEO bet (per D19). Without measurement you can't tell if the bet paid off.
@@ -121,6 +129,14 @@ Captured by /plan-eng-review on 2026-05-30. Items the eng review surfaced but ex
 **Pros:** Catches a class of bug that desktop testing misses.
 **Cons:** Playwright mobile emulation isn't perfect for iframe keyboard interaction.
 **Context:** Worth a manual real-device test before launch even if the Playwright test passes.
+
+### Homepage scaling breakpoint
+**What:** Add a build-time warning in `getAllParksForHomepage()` (src/lib/park-query.ts) when the parks count exceeds 200. At 48 the client-serialized list is ~7KB; at 500 it would be ~75KB and the client-side sort+filter model starts hurting cold-load perf. When the warn fires, switch to either pagination/virtualization or a server-routed sort (`?near=lat,lng` query string with server-side sort).
+**Why:** Owner clarification 2026-05-30: all 150+ parks will have profile pages once the 99 stubs are authored. Without a tripwire, the homepage payload grows silently past the comfortable zone.
+**Pros:** Prevents silent perf regression. Trivial alert (~5 LOC), no implementation work yet.
+**Cons:** None — measurement only.
+**Context:** Surfaced by `/codex` outside voice during phase 6 plan-eng-review. The check sits in the same query function that already loads the data, so zero new code paths.
+**Depends on:** Owner workflow for 99 stub parks (P1 above) determines when this trips.
 
 ---
 

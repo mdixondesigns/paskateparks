@@ -112,7 +112,7 @@ describe("ParkProfile — 16-section canonical order per DESIGN.md", () => {
   });
 
   it("hides Nearby Parks/Shops when both are empty", () => {
-    const { queryByRole } = render(
+    render(
       <ParkProfile park={makeFullPark()} nearbyParks={[]} nearbyShops={[]} />,
     );
     // queryByRole('heading') would match every section; just check the two specific labels

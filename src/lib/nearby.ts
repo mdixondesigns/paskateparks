@@ -34,6 +34,10 @@ export interface WithCoords {
  * 99 stub parks don't have coords yet).
  * Returns items with a `distanceMiles` field appended, sorted nearest-first.
  */
+function isValidCoord(v: number | null): v is number {
+  return v != null && Number.isFinite(v);
+}
+
 export function findNearby<T extends WithCoords>(
   origin: LatLng,
   candidates: readonly T[],
@@ -41,7 +45,15 @@ export function findNearby<T extends WithCoords>(
 ): (T & { distanceMiles: number })[] {
   const results: (T & { distanceMiles: number })[] = [];
   for (const c of candidates) {
-    if (c.lat == null || c.lng == null) continue;
+    // Defense in depth: NULL coords are common (99 stub parks per
+    // STACK-PIVOT.md finding #2). NaN/Infinity should never reach here —
+    // db:check-coords gates against it — but if they did, haversineMiles
+    // would produce NaN and the sort would silently misorder. Drop them.
+    if (!isValidCoord(c.lat) || !isValidCoord(c.lng)) continue;
+    // Bounds check: lat in [-90, 90], lng in [-180, 180]. Out-of-bounds
+    // values would still compute a Haversine number but it would be
+    // meaningless. Same defensive principle.
+    if (c.lat < -90 || c.lat > 90 || c.lng < -180 || c.lng > 180) continue;
     if (
       "id" in c &&
       typeof c.id === "number" &&
