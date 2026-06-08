@@ -81,8 +81,25 @@ export async function getParkBySlug(slug: string) {
 
 export type ParkWithRelations = NonNullable<Awaited<ReturnType<typeof getParkBySlug>>>;
 
-/** All parks with non-null coords — feed for Nearby Parks at build time. */
+/**
+ * All OPEN parks with non-null coords — feed for Nearby Parks at build time
+ * AND the /map/ pin set (via the getOpenParksForMap wrapper below).
+ *
+ * D11 consistency fix (phase 7, plan-eng-review 1C): the WHERE status='open'
+ * predicate matches the homepage's getAllParksForHomepage. A parent reading
+ * a park profile must not be recommended a closed park as "nearby" — same
+ * trust failure adversarial review caught for / in phase 6, latent on every
+ * park profile since phase 4. Closed park profiles still render at
+ * /park/<slug> as historical record per D11; they just don't appear on
+ * other parks' discovery surfaces.
+ */
 export async function getAllParksForNearby(excludeParkId?: number) {
+  // Alpha order at the source so the /map/ sr-only fallback list (and any
+  // other future caller that doesn't re-sort) matches the homepage's D1
+  // alpha order. findNearby() ignores this order — it sorts by Haversine
+  // distance — so per-park Nearby Parks is unaffected. Phase 7 ship-review
+  // adversarial fix (A2): without this, the /map/ fallback list shipped in
+  // DB physical order, regressing from the homepage's alpha contract.
   const rows = await db
     .select({
       id: parks.id,
@@ -96,12 +113,63 @@ export async function getAllParksForNearby(excludeParkId?: number) {
     .from(parks)
     .where(
       and(
+        eq(parks.status, "open"),
         isNotNull(parks.lat),
         isNotNull(parks.lng),
         excludeParkId != null ? ne(parks.id, excludeParkId) : undefined,
       ),
-    );
+    )
+    .orderBy(asc(parks.name));
   return rows;
+}
+
+/**
+ * Same data as getAllParksForNearby, but with lat/lng type-narrowed to
+ * non-nullable. Phase 7 plan-eng-review CMT-2: Drizzle's inferred type sees
+ * `lat: number | null` even after the runtime isNotNull filter — the map code
+ * shouldn't have to non-null-assert. This wrapper carries the runtime narrowing
+ * into the type system via a type predicate, with the single source of truth
+ * for the OPEN+coords WHERE staying in getAllParksForNearby above.
+ */
+export interface MapParkRow {
+  id: number;
+  slug: string;
+  name: string;
+  city: string;
+  state: string;
+  lat: number;
+  lng: number;
+}
+
+/**
+ * Type predicate for the getOpenParksForMap wrapper. Exported for unit
+ * testing the type-narrowing logic without standing up a Postgres connection.
+ *
+ * Phase 7 ship-review adversarial fix (A3): besides the null check that the
+ * type system requires, also reject NaN / Infinity / out-of-bounds values
+ * the same way findNearby() does in src/lib/nearby.ts. db:check-coords gates
+ * against bad values landing in production, but defense-in-depth: a CMS
+ * typo (lat=999) would otherwise poison L.marker + fitBounds on /map/ and
+ * break the entire map for everyone.
+ */
+export function hasCoords(p: {
+  id: number;
+  slug: string;
+  name: string;
+  city: string;
+  state: string;
+  lat: number | null;
+  lng: number | null;
+}): p is MapParkRow {
+  if (p.lat === null || p.lng === null) return false;
+  if (!Number.isFinite(p.lat) || !Number.isFinite(p.lng)) return false;
+  if (p.lat < -90 || p.lat > 90 || p.lng < -180 || p.lng > 180) return false;
+  return true;
+}
+
+export async function getOpenParksForMap(): Promise<MapParkRow[]> {
+  const rows = await getAllParksForNearby();
+  return rows.filter(hasCoords);
 }
 
 /** All shops with non-null coords — feed for Nearby Shops at build time. */

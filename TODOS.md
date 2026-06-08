@@ -67,6 +67,14 @@ Captured by /plan-eng-review on 2026-05-30. Items the eng review surfaced but ex
 **Cons:** ~2 hrs of setup.
 **Context:** Tied to D16 analytics decision and D19 monitoring commitment.
 
+### Tile provider — migrate off OSM public tiles before launch
+**What:** Evaluate Stadia Maps / CARTO / MapTiler free tiers and pick one as the production tile provider. Cutover is a single `L.tileLayer(...)` URL change + adding the API key as a Vercel env var (e.g. `NEXT_PUBLIC_TILE_PROVIDER_URL`).
+**Why:** OSM Foundation's Tile Usage Policy is best-effort: "heavy use" can be silently blocked with no warning, no SLA, and a visible-attribution + cache-compliance + no-prefetching contract. The site's stated goal is to RANK for "PA skateparks" — success means traffic, which means OSM-block risk grows with launch traction. The cutover has to happen before the block, not after — by definition we wouldn't see the block coming.
+**Pros:** Removes a hidden launch-window failure mode. Provider dashboards give D18 traffic observability. The chosen TileLayer URL is the ONLY phase-7 code that needs to change. ~30 min total.
+**Cons:** One more 3rd-party account and one more env var to maintain. Slight ongoing rate-limit awareness vs OSM's "as much as you can get away with."
+**Context:** Phase 7 (Leaflet map at /map/) ships against `https://tile.openstreetmap.org/{z}/{x}/{y}.png` as documented in CMT-5 of the phase-7 plan-eng-review. Free-tier candidates: Stadia Maps (200K req/mo), CARTO (50K tiles/day), MapTiler (100K req/mo). All accept browser-side API keys + hostname allowlists.
+**Depends on:** Phase 7 ship (TileLayer module exists). Blocks phase 10 launch.
+
 ---
 
 ## P2 — nice to have, defer to post-launch
