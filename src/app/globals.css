@@ -11,3 +11,19 @@
     scroll-behavior: auto !important;
   }
 }
+
+/* Phase 7 CMT-3 — visible fallback park list on /map/ flips off once the
+   MapView client component signals first-tile-load (it sets data-map-mounted
+   on <body>; see MapView.tsx). If the map never mounts (slow 4G, JS error,
+   blocked tiles, OSM tile-server block), the list stays visible so the
+   sighted user always has a usable representation.
+
+   Phase 7 ship adversarial fix (A1): use `display: none` rather than
+   sr-only-style clip so the 48 hidden park links are also removed from the
+   tab order. A sighted keyboard user (no screen reader) was otherwise
+   tabbing through 48 invisible links before reaching map controls. The map
+   itself is the equivalent experience for screen-reader users in the
+   mounted state (Leaflet markers carry default keyboard focus). */
+body[data-map-mounted="true"] .map-fallback-list {
+  display: none;
+}

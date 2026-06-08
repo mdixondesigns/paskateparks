@@ -192,4 +192,52 @@ describe("NearMeButton", () => {
     fireEvent.click(await screen.findByRole("button"));
     await waitFor(() => expect(onLocation).toHaveBeenCalledWith(90, 180));
   });
+
+  it("phase-7 ref-guard: a second click with identical coords does not re-fire onLocation", async () => {
+    const onLocation = vi.fn();
+    const mock: MockGeolocation = {
+      getCurrentPosition: vi.fn((success: Success) => {
+        // Browser returns the cached same-coords fix (matches D10
+        // maximumAge: 60_000 behavior).
+        success({ coords: { latitude: 39.95, longitude: -75.16 } });
+      }),
+    };
+    installGeolocation(mock);
+    render(<NearMeButton onLocation={onLocation} onError={vi.fn()} />);
+    const btn = await screen.findByRole("button");
+    fireEvent.click(btn);
+    await waitFor(() => expect(onLocation).toHaveBeenCalledTimes(1));
+    expect(onLocation).toHaveBeenCalledWith(39.95, -75.16);
+    // Second click — browser returns identical coords. HomeParkList's sort
+    // is idempotent for identical coords, so the bridge effect suppresses
+    // the callback (see NearMeButton.tsx comment).
+    fireEvent.click(btn);
+    await waitFor(() => expect(mock.getCurrentPosition).toHaveBeenCalledTimes(2));
+    // onLocation count unchanged.
+    expect(onLocation).toHaveBeenCalledTimes(1);
+  });
+
+  it("phase-7 ref-guard: a second click with NEW coords does fire onLocation again", async () => {
+    const onLocation = vi.fn();
+    let call = 0;
+    const mock: MockGeolocation = {
+      getCurrentPosition: vi.fn((success: Success) => {
+        call += 1;
+        if (call === 1) {
+          success({ coords: { latitude: 39.95, longitude: -75.16 } });
+        } else {
+          // User moved (or browser refreshed the fix).
+          success({ coords: { latitude: 40.45, longitude: -79.99 } });
+        }
+      }),
+    };
+    installGeolocation(mock);
+    render(<NearMeButton onLocation={onLocation} onError={vi.fn()} />);
+    const btn = await screen.findByRole("button");
+    fireEvent.click(btn);
+    await waitFor(() => expect(onLocation).toHaveBeenCalledWith(39.95, -75.16));
+    fireEvent.click(btn);
+    await waitFor(() => expect(onLocation).toHaveBeenCalledWith(40.45, -79.99));
+    expect(onLocation).toHaveBeenCalledTimes(2);
+  });
 });

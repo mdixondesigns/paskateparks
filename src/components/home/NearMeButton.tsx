@@ -1,33 +1,25 @@
 "use client";
 
-import { useState, useSyncExternalStore } from "react";
+import { useEffect, useRef } from "react";
 
-// Phase 6 D8 + D10 + P1-B + P1-E — geolocation client component.
+import { geoButtonLabels, useGeolocation, type GeoErrorReason } from "@/lib/use-geolocation";
+
+// Phase 6 D8 + D10 + P1-B + P1-E — homepage "Find parks near me" button.
 //
-//   ┌─ NearMeButton state machine ────────────────────────────────────┐
-//   │                                                                 │
-//   │   idle  ──click──►  pending  ──success──►  (lift via onLocation)│
-//   │    ▲                  │                                          │
-//   │    │                  ├──permission denied──►  denied  ──┐       │
-//   │    │                  │                                  │       │
-//   │    │                  ├──timeout (10s)──────►  error  ───┤       │
-//   │    │                  │                                  │       │
-//   │    │                  └──other position error─►  error  ─┤       │
-//   │    │                                                     │       │
-//   │    └─────────────────  click again  ─────────────────────┘       │
-//   │                                                                 │
-//   │   unsupported = component returns null (no button rendered)     │
-//   └─────────────────────────────────────────────────────────────────┘
+// Phase 7 refactor: the geolocation state machine + bounds check + D10 options
+// now live in `useGeolocation` (src/lib/use-geolocation.ts) so this component
+// and /map/'s floating Find-me control share one tested module. The component
+// stays a thin presentation layer that bridges hook state to the parent's
+// callback API (onLocation, onError) — preserving phase-6's external contract
+// so HomeParkList doesn't need to change.
 //
 // Locked copy per P1-E:
 //   idle    → "Find parks near me"
 //   pending → "Finding your location…"
 //   denied  → "Location unavailable — use the filter"
 //   error   → "Couldn't get location — try again"
-//
-// Bounds check per P1-B: latitude in [-90, 90], longitude in [-180, 180], both finite.
 
-export type GeoErrorReason = "denied" | "timeout" | "unavailable" | "invalid";
+export type { GeoErrorReason };
 
 export interface NearMeButtonProps {
   /** Called with valid, bounds-checked coordinates after a successful fix. */
@@ -36,91 +28,59 @@ export interface NearMeButtonProps {
   onError: (reason: GeoErrorReason) => void;
 }
 
-type State = "idle" | "pending" | "denied" | "error";
-
-const LABELS: Record<State, string> = {
-  idle: "Find parks near me",
-  pending: "Finding your location…",
-  denied: "Location unavailable — use the filter",
-  error: "Couldn't get location — try again",
-};
-
-function isValidCoord(lat: number, lng: number): boolean {
-  return (
-    Number.isFinite(lat) &&
-    Number.isFinite(lng) &&
-    lat >= -90 &&
-    lat <= 90 &&
-    lng >= -180 &&
-    lng <= 180
-  );
-}
-
-// Feature-detect via useSyncExternalStore. Returns false on the SSR snapshot
-// (matches the server HTML — no hydration mismatch) and the actual boolean on
-// the client after mount. Avoids the `react-hooks/set-state-in-effect` lint
-// error that the older useEffect+setState pattern triggered in React 19.
-const noopSubscribe = () => () => {};
-const getGeoSnapshot = () => typeof navigator !== "undefined" && !!navigator.geolocation;
-const getGeoServerSnapshot = () => false;
+// Phase 7: label factory lives in use-geolocation so both consumers (this
+// button + /map/'s floating Find-me) share the locked idle/pending/error
+// copy and only the denied-state CTA suffix differs per surface.
+const LABELS = geoButtonLabels("use the filter");
 
 export function NearMeButton({ onLocation, onError }: NearMeButtonProps) {
-  const [state, setState] = useState<State>("idle");
-  const supported = useSyncExternalStore(noopSubscribe, getGeoSnapshot, getGeoServerSnapshot);
+  const geo = useGeolocation();
+  // Track the last delivered values so we only fire callbacks on transitions,
+  // not on unrelated re-renders. Refs (not state) keep the bridge effects from
+  // looping on themselves.
+  //
+  // Note on the value-equality check below: if the user re-taps and the
+  // browser returns the cached same-coords fix (likely given D10's
+  // maximumAge: 60_000), `geo.location` is a new object reference but the
+  // lat/lng numbers are identical. We skip onLocation in that case because
+  // HomeParkList's sort is idempotent for identical coords — re-firing would
+  // re-run the same Haversine pass with no observable effect.
+  const lastLocation = useRef<{ lat: number; lng: number } | null>(null);
+  const lastError = useRef<GeoErrorReason | null>(null);
 
-  if (!supported) return null;
+  useEffect(() => {
+    if (
+      geo.location &&
+      (lastLocation.current?.lat !== geo.location.lat ||
+        lastLocation.current?.lng !== geo.location.lng)
+    ) {
+      lastLocation.current = geo.location;
+      onLocation(geo.location.lat, geo.location.lng);
+    }
+  }, [geo.location, onLocation]);
 
-  function handleClick() {
-    setState("pending");
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const { latitude, longitude } = pos.coords;
-        if (!isValidCoord(latitude, longitude)) {
-          setState("error");
-          onError("invalid");
-          return;
-        }
-        // Don't clear state to "idle" — if user re-taps after granting, the
-        // browser permission is sticky and the call resolves fast. We stay
-        // "idle" so the button reads "Find parks near me" again (lets them
-        // refresh their position).
-        setState("idle");
-        onLocation(latitude, longitude);
-      },
-      (err) => {
-        if (err.code === err.PERMISSION_DENIED) {
-          setState("denied");
-          onError("denied");
-        } else if (err.code === err.TIMEOUT) {
-          setState("error");
-          onError("timeout");
-        } else {
-          setState("error");
-          onError("unavailable");
-        }
-      },
-      {
-        timeout: 10_000,
-        maximumAge: 60_000,
-        enableHighAccuracy: false,
-      },
-    );
-  }
+  useEffect(() => {
+    if (geo.error && geo.error !== lastError.current) {
+      lastError.current = geo.error;
+      onError(geo.error);
+    } else if (!geo.error) {
+      lastError.current = null;
+    }
+  }, [geo.error, onError]);
 
-  // Once denied, the browser permission is sticky — re-tapping won't reshow
-  // the prompt. Disable the button in that state. "error" stays clickable
-  // (timeout/unavailable are transient; user can retry).
-  const disabled = state === "pending" || state === "denied";
+  if (!geo.supported) return null;
 
+  // Disabled rule lives in useGeolocation now — single source of truth for
+  // both this button and /map/'s floating Find-me.
   return (
     <button
       type="button"
-      onClick={handleClick}
-      disabled={disabled}
-      aria-busy={state === "pending"}
+      onClick={geo.request}
+      disabled={geo.disabled}
+      aria-busy={geo.status === "pending"}
       className="rounded border px-4 py-2 text-sm font-medium disabled:opacity-60"
     >
-      {LABELS[state]}
+      {LABELS[geo.status]}
     </button>
   );
 }

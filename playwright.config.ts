@@ -14,12 +14,17 @@ export default defineConfig({
     trace: "on-first-retry",
   },
   webServer: {
-    command: "pnpm dev",
+    // Phase 7 plan-eng-review CMT-6 (Codex C8): CI runs against the production
+    // bundle so the dynamic-import + ssr:false path on /map/ exercises the
+    // chunked, minified build — not dev mode. Local stays on `pnpm dev` for
+    // hot-reload iteration speed.
+    command: process.env.CI ? "pnpm build && pnpm start" : "pnpm dev",
     url: `http://localhost:${PORT}`,
     reuseExistingServer: !process.env.CI,
     stdout: "ignore",
     stderr: "pipe",
-    timeout: 120_000,
+    // Build + start takes ~30-40s on this project; raise the timeout in CI.
+    timeout: process.env.CI ? 240_000 : 120_000,
   },
   projects: [
     // P0 use case (parent on Android in parking lot): test mobile first.
