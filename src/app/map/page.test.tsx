@@ -60,15 +60,15 @@ describe("/map/ RSC page", () => {
     expect(list).toHaveClass("map-fallback-list");
   });
 
-  it("emits <link rel='preconnect'> to tile.openstreetmap.org (CMT-4)", async () => {
+  it("emits <link rel='preconnect'> to a.basemaps.cartocdn.com (CMT-4)", async () => {
     const { container } = render(await MapPage());
     // React 19 hoists <link> elements to document.head at runtime. happy-dom
     // honors this, so query both the container (early-render position) and
     // document.head (after hoist).
     const preconnect =
-      container.querySelector('link[rel="preconnect"][href="https://tile.openstreetmap.org"]') ||
-      document.head.querySelector('link[rel="preconnect"][href="https://tile.openstreetmap.org"]');
-    expect(preconnect, "expected <link rel='preconnect'> for tile.openstreetmap.org").not.toBeNull();
+      container.querySelector('link[rel="preconnect"][href="https://a.basemaps.cartocdn.com"]') ||
+      document.head.querySelector('link[rel="preconnect"][href="https://a.basemaps.cartocdn.com"]');
+    expect(preconnect, "expected <link rel='preconnect'> for a.basemaps.cartocdn.com").not.toBeNull();
   });
 
   it("dynamic-imports MapView and passes the parks prop", async () => {

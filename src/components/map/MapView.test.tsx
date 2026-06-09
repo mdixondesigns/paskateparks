@@ -76,7 +76,7 @@ vi.mock("leaflet/dist/images/marker-shadow.png", () => ({
   default: { src: "/mock-shadow.png", width: 41, height: 41 },
 }));
 
-import { MapView, type MapPark } from "./MapView";
+import { MapView, resolveAssetUrl, type MapPark } from "./MapView";
 
 const PA_PARKS: MapPark[] = [
   { id: 1, slug: "fdr", name: "FDR Skatepark", city: "Philadelphia", state: "PA", lat: 39.91, lng: -75.18 },
@@ -126,11 +126,11 @@ describe("MapView — Leaflet init flow", () => {
     expect(L.map).toHaveBeenCalledTimes(1);
   });
 
-  it("attaches the OSM tile layer (CMT-4: main host, no a/b/c subdomain)", () => {
+  it("attaches the CARTO Positron tile layer (CMT-4: single subdomain for HTTP/2)", () => {
     render(<MapView parks={PA_PARKS} />);
     expect(L.tileLayer).toHaveBeenCalledTimes(1);
     const url = L.tileLayer.mock.calls[0]?.[0];
-    expect(url).toBe("https://tile.openstreetmap.org/{z}/{x}/{y}.png");
+    expect(url).toBe("https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png");
     expect(tileLayerInstance.addTo).toHaveBeenCalledWith(mapInstance);
   });
 
@@ -233,6 +233,24 @@ describe("MapView — Leaflet init flow", () => {
       iconRetinaUrl: "/mock-icon-2x.png",
       shadowUrl: "/mock-shadow.png",
     });
+  });
+});
+
+describe("resolveAssetUrl — Turbopack/Webpack shape normalizer", () => {
+  // Regression lock: Next 16 + Turbopack returns image imports as a plain
+  // URL string; Webpack and the vitest mocks return a StaticImageData object.
+  // Accessing `.src` directly on the string yields undefined and shipped
+  // src="undefined" markers on /map/. The full mergeOptions assertion above
+  // exercises the object path via the existing vi.mock; this block locks
+  // the string path so a future refactor can't silently drop it.
+  it("returns the string verbatim when handed a string (Turbopack runtime)", () => {
+    expect(resolveAssetUrl("/marker-icon.png")).toBe("/marker-icon.png");
+  });
+
+  it("returns the .src when handed a StaticImageData object (Webpack/tests)", () => {
+    expect(resolveAssetUrl({ src: "/marker-icon.png", width: 25, height: 41 })).toBe(
+      "/marker-icon.png",
+    );
   });
 });
 
