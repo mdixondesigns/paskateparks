@@ -6,9 +6,11 @@ import { getOpenParksForMap } from "@/lib/park-query";
 //   1E + CMT-3 — visible-by-default park list in the RSC; MapView's mount
 //                signal flips it to sr-only via globals.css. If the map
 //                never mounts, the list stays visible for sighted users.
-//   CMT-4 — inline <link rel="preconnect"> for tile.openstreetmap.org via
+//   CMT-4 — inline <link rel="preconnect"> for a.basemaps.cartocdn.com via
 //           React 19 head-hoisting (cleaner than Next metadata.other, which
-//           only emits <meta>, not <link>)
+//           only emits <meta>, not <link>). Must match the single-subdomain
+//           tile URL in MapView.tsx so the preconnect actually warms the
+//           same origin Leaflet hits.
 //   P1-C — force-static; phase-9 webhook revalidates when parks change
 //
 // MapViewLoader is a thin client-component shim that handles the
@@ -32,7 +34,7 @@ export default async function MapPage() {
           Inline JSX is the cleanest way to emit per-route preconnect in App
           Router. The P0 audience (modern mobile Chrome / Safari) all support
           preconnect, so the dns-prefetch fallback would be redundant. */}
-      <link rel="preconnect" href="https://tile.openstreetmap.org" />
+      <link rel="preconnect" href="https://a.basemaps.cartocdn.com" />
 
       <header className="sr-only">
         {/* H1 is screen-reader-only; the map dominates the viewport visually. */}

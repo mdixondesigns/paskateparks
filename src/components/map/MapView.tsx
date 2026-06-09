@@ -6,7 +6,7 @@
 //   │                                                                 │
 //   │   mount → init useEffect (runs once, deps=[]) ──┐                │
 //   │     • L.map(container)                          │                │
-//   │     • L.tileLayer(OSM, main host).addTo(map)    │                │
+//   │     • L.tileLayer(CARTO Positron).addTo(map)    │                │
 //   │     • L.markerClusterGroup() — D12              │                │
 //   │     • for each park → L.marker + bindPopup      │                │
 //   │     • fitBounds(park bbox, padding=40)          │                │
@@ -24,7 +24,9 @@
 //   2A — popups via buildPopupNode (createElement + textContent)
 //   CMT-1 — markercluster KEPT (Philly/Pittsburgh density needs it)
 //   CMT-3 — data-map-mounted swap: visible fallback list goes sr-only on mount
-//   CMT-4 — TileLayer URL uses main tile.openstreetmap.org host (no a/b/c)
+//   CMT-4 — CARTO Positron tile basemap (was tile.openstreetmap.org in phase 7;
+//           swapped post-ship for a more stylized minimal look and to close
+//           the P1 OSM-public-tile-policy migration TODO)
 
 import "leaflet/dist/leaflet.css";
 import "leaflet.markercluster/dist/MarkerCluster.css";
@@ -36,7 +38,12 @@ import { useEffect, useRef } from "react";
 
 // Bundler footgun fix: Leaflet's default icon URLs point at paths that don't
 // survive Next's build. Pin explicit URLs from the installed leaflet package.
-// Next 16 image imports return a StaticImageData object — use .src.
+// Next 16 + Turbopack returns the URL as a plain string; Webpack and the
+// vitest mocks return a StaticImageData object ({src, width, height}). The
+// resolveAssetUrl helper below normalizes both — accessing `.src` directly
+// on the Turbopack-returned string yields undefined and ships markers with
+// src="undefined" (the broken-image bug surfaced post-CARTO swap when the
+// marker glyphs became visible against the lighter Positron base).
 import iconRetinaUrl from "leaflet/dist/images/marker-icon-2x.png";
 import iconUrl from "leaflet/dist/images/marker-icon.png";
 import shadowUrl from "leaflet/dist/images/marker-shadow.png";
@@ -48,16 +55,27 @@ import type { MapParkRow } from "@/lib/park-query";
 
 import { buildPopupNode } from "./MapPopupContent";
 
+export function resolveAssetUrl(asset: unknown): string {
+  return typeof asset === "string" ? asset : (asset as { src: string }).src;
+}
+
 L.Icon.Default.mergeOptions({
-  iconUrl: iconUrl.src,
-  iconRetinaUrl: iconRetinaUrl.src,
-  shadowUrl: shadowUrl.src,
+  iconUrl: resolveAssetUrl(iconUrl),
+  iconRetinaUrl: resolveAssetUrl(iconRetinaUrl),
+  shadowUrl: resolveAssetUrl(shadowUrl),
 });
 
-const OSM_TILE_URL = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
-const OSM_ATTRIBUTION =
-  '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
-const OSM_MAX_ZOOM = 19;
+// CARTO Positron — minimal light basemap. Same OSM data underneath, rendered
+// in a clean light-grey/cream style so pin clusters pop instead of competing
+// with road labels and land-use color. Single subdomain (a.) — modern HTTP/2
+// multiplexes one origin faster than the legacy a/b/c/d shard pattern, and
+// keeps the preconnect <link> in page.tsx pointed at one host. Free tier:
+// up to ~75K mapviews/mo without an API key per CARTO's public basemap
+// policy; closes the P1 OSM-tile-policy TODO from CMT-5.
+const TILE_URL = "https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png";
+const TILE_ATTRIBUTION =
+  '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>';
+const TILE_MAX_ZOOM = 20;
 const PA_CENTROID: L.LatLngTuple = [40.9, -77.5];
 const PA_DEFAULT_ZOOM = 7;
 // City-level zoom — used both for the geo-grant flyTo target and the degenerate
@@ -107,13 +125,13 @@ export function MapView({ parks }: MapViewProps) {
 
     // Phase 7 ship-review adversarial fix (A4): we set data-map-mounted
     // (which CSS uses to hide the fallback list) only after the FIRST batch
-    // of tiles loads successfully. If OSM is blocked or 502s, tiles never
-    // load, data-map-mounted is never set, and the fallback list stays
-    // visible — exactly the progressive-enhancement contract CMT-3 promised.
-    // `once` not `on` so a later pan/zoom doesn't re-trigger.
-    const tileLayer = L.tileLayer(OSM_TILE_URL, {
-      attribution: OSM_ATTRIBUTION,
-      maxZoom: OSM_MAX_ZOOM,
+    // of tiles loads successfully. If the tile provider is blocked or 502s,
+    // tiles never load, data-map-mounted is never set, and the fallback list
+    // stays visible — exactly the progressive-enhancement contract CMT-3
+    // promised. `once` not `on` so a later pan/zoom doesn't re-trigger.
+    const tileLayer = L.tileLayer(TILE_URL, {
+      attribution: TILE_ATTRIBUTION,
+      maxZoom: TILE_MAX_ZOOM,
     });
     tileLayer.once("load", () => {
       document.body.dataset.mapMounted = "true";
