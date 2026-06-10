@@ -5,11 +5,13 @@
 //   • helmets   — DESIGN.md D16
 //   • link types — DESIGN.md D21 / D23
 
+import {
+  obstacleType,
+} from "@/db/schema";
 import type {
   amenityType,
   helmetsPolicy,
   linkType,
-  obstacleType,
   ridingSurface,
   parkStatus,
   parkType as parkTypeEnum,
@@ -145,4 +147,29 @@ export function isConnectLink(type: LinkType): boolean {
 
 export function isSupportLink(type: LinkType): boolean {
   return (SUPPORT_LINK_TYPES as readonly LinkType[]).includes(type);
+}
+
+// Phase 8 — Obstacle slug helpers for /obstacle/[slug] taxonomy archive routes.
+//
+// WP stored obstacles as taxonomy term slugs with hyphens (e.g. "quarter-pipe");
+// the Drizzle enum stores them as snake_case (e.g. "quarter_pipe"). Round-trip
+// is a pure character substitution — verified for all 38 in
+// scripts/migrate-wp/transform.ts:331 (slug.replace(/-/g, "_")).
+//
+// Both helpers are pure + sync so they're safe to use anywhere (RSC, client,
+// build script). obstacleForSlug uses a Set lookup (NOT an `as ObstacleType`
+// cast) so the return type is honest — unknown slugs return undefined and
+// the route falls to notFound().
+
+export function obstacleSlug(obstacle: ObstacleType): string {
+  return obstacle.replace(/_/g, "-");
+}
+
+const OBSTACLE_SLUG_SET = new Set<string>(
+  obstacleType.enumValues.map((v) => v.replace(/_/g, "-")),
+);
+
+export function obstacleForSlug(slug: string): ObstacleType | undefined {
+  if (!OBSTACLE_SLUG_SET.has(slug)) return undefined;
+  return slug.replace(/-/g, "_") as ObstacleType;
 }

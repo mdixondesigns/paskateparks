@@ -164,7 +164,15 @@ export const parks = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [uniqueIndex("parks_slug_idx").on(t.slug)],
+  (t) => [
+    uniqueIndex("parks_slug_idx").on(t.slug),
+    // Phase 8 CMT-6A — supports /county/[slug] WHERE status='open' AND county=X.
+    // Composite (county, status) means the index can satisfy both the
+    // WHERE-by-county and the WHERE-by-status filters with a single index scan
+    // (Postgres can use a multi-column index for either a leading-column
+    // predicate alone or both columns).
+    index("parks_county_status_idx").on(t.county, t.status),
+  ],
 );
 
 export const parkRenovations = pgTable("park_renovations", {
@@ -196,7 +204,14 @@ export const parkObstacles = pgTable(
       .references(() => parks.id, { onDelete: "cascade" }),
     obstacle: obstacleType("obstacle").notNull(),
   },
-  (t) => [primaryKey({ columns: [t.parkId, t.obstacle] })],
+  (t) => [
+    primaryKey({ columns: [t.parkId, t.obstacle] }),
+    // Phase 8 CMT-6A — supports /obstacle/[slug] WHERE obstacle=X. The PK on
+    // (park_id, obstacle) leads with park_id, so a filter-by-obstacle hits no
+    // index. This standalone index on obstacle makes the taxonomy archive
+    // queries fast as the row count scales past the current ~150.
+    index("park_obstacles_obstacle_idx").on(t.obstacle),
+  ],
 );
 
 // E4 — universal amenity model as child table, not 21-flat-column model.

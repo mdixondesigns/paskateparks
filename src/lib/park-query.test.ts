@@ -20,23 +20,122 @@ import { hasCoords } from "./park-query";
 // query functions, not their bodies). Crude but bulletproof — if someone
 // deletes the status='open' filter the test fails.
 
+function fnBody(name: string): string {
+  const path = resolve(process.cwd(), "src/lib/park-query.ts");
+  const source = readFileSync(path, "utf-8");
+  const fnStart = source.indexOf(`export async function ${name}`);
+  expect(fnStart, `${name} export not found`).toBeGreaterThan(-1);
+  // Find the end of this function: the next `\n}\n` after fnStart.
+  const fnEnd = source.indexOf("\n}\n", fnStart);
+  expect(fnEnd, `could not find end of ${name} body`).toBeGreaterThan(fnStart);
+  return source.slice(fnStart, fnEnd);
+}
+
 describe("getAllParksForNearby — D11 status='open' filter (regression boundary)", () => {
   it("source contains eq(parks.status, 'open') in the function body", () => {
-    // resolve from cwd (repo root in vitest) — works regardless of how Vite
-    // resolves import.meta.url, which can be a non-file URL scheme.
-    const path = resolve(process.cwd(), "src/lib/park-query.ts");
-    const source = readFileSync(path, "utf-8");
-    const fnStart = source.indexOf("export async function getAllParksForNearby");
-    expect(fnStart, "getAllParksForNearby export not found").toBeGreaterThan(-1);
-    // Find the end of this function: the next `\n}\n` after fnStart.
-    const fnEnd = source.indexOf("\n}\n", fnStart);
-    expect(fnEnd, "could not find end of getAllParksForNearby body").toBeGreaterThan(fnStart);
-    const fnBody = source.slice(fnStart, fnEnd);
-    expect(fnBody, "missing eq(parks.status, 'open') filter").toMatch(
+    const body = fnBody("getAllParksForNearby");
+    expect(body, "missing eq(parks.status, 'open') filter").toMatch(
       /eq\(parks\.status,\s*["']open["']\)/,
     );
-    expect(fnBody, "missing isNotNull(parks.lat)").toMatch(/isNotNull\(parks\.lat\)/);
-    expect(fnBody, "missing isNotNull(parks.lng)").toMatch(/isNotNull\(parks\.lng\)/);
+    expect(body, "missing isNotNull(parks.lat)").toMatch(/isNotNull\(parks\.lat\)/);
+    expect(body, "missing isNotNull(parks.lng)").toMatch(/isNotNull\(parks\.lng\)/);
+  });
+});
+
+// Phase 8 plan-eng-review 3A + CMT-5A — taxonomy archive queries enforce the
+// same status='open' D11 filter as the discovery surfaces above, plus the
+// JOIN shape required to feed the /county/[slug] and /obstacle/[slug] pages.
+// The source-regex pattern catches:
+//   • dropped filter (and/or swap fails the and() check too)
+//   • missing JOIN on parkObstacles
+//   • wrong sort column
+//   • selectDistinct removed (would render duplicate routes)
+
+describe("getParksByCounty — phase 8 D11 filter + JOIN shape (CMT-5A)", () => {
+  it("filters status='open' (discovery surface, must exclude closed)", () => {
+    expect(fnBody("getParksByCounty")).toMatch(/eq\(parks\.status,\s*["']open["']\)/);
+  });
+
+  it("filters by parks.county", () => {
+    expect(fnBody("getParksByCounty")).toMatch(/eq\(parks\.county,/);
+  });
+
+  it("composes filters with and() (catches and/or swap)", () => {
+    expect(fnBody("getParksByCounty")).toMatch(/and\(/);
+  });
+
+  it("orders alpha by parks.name", () => {
+    expect(fnBody("getParksByCounty")).toMatch(/orderBy\(asc\(parks\.name\)\)/);
+  });
+
+  it("joins hero photos via getHeroPhotoFor", () => {
+    expect(fnBody("getParksByCounty")).toMatch(/getHeroPhotoFor\(/);
+  });
+
+  it("returns [] on empty rows without re-querying photos (perf)", () => {
+    expect(fnBody("getParksByCounty")).toMatch(/rows\.length === 0/);
+  });
+});
+
+describe("getParksByObstacle — phase 8 D11 filter + JOIN shape (CMT-5A)", () => {
+  it("filters status='open' (discovery surface, must exclude closed)", () => {
+    expect(fnBody("getParksByObstacle")).toMatch(/eq\(parks\.status,\s*["']open["']\)/);
+  });
+
+  it("innerJoin park_obstacles on park_id (the JOIN is the whole point)", () => {
+    expect(fnBody("getParksByObstacle")).toMatch(
+      /innerJoin\(\s*parkObstacles,\s*eq\(parkObstacles\.parkId,\s*parks\.id\)/,
+    );
+  });
+
+  it("filters by parkObstacles.obstacle", () => {
+    expect(fnBody("getParksByObstacle")).toMatch(/eq\(parkObstacles\.obstacle,/);
+  });
+
+  it("composes filters with and() (catches and/or swap)", () => {
+    expect(fnBody("getParksByObstacle")).toMatch(/and\(/);
+  });
+
+  it("orders alpha by parks.name", () => {
+    expect(fnBody("getParksByObstacle")).toMatch(/orderBy\(asc\(parks\.name\)\)/);
+  });
+
+  it("joins hero photos via getHeroPhotoFor", () => {
+    expect(fnBody("getParksByObstacle")).toMatch(/getHeroPhotoFor\(/);
+  });
+});
+
+describe("getCountiesWithOpenParks — generateStaticParams feed (phase 8)", () => {
+  it("filters status='open' so empty-after-close counties are dropped", () => {
+    expect(fnBody("getCountiesWithOpenParks")).toMatch(
+      /eq\(parks\.status,\s*["']open["']\)/,
+    );
+  });
+
+  it("ignores parks with null county", () => {
+    expect(fnBody("getCountiesWithOpenParks")).toMatch(/isNotNull\(parks\.county\)/);
+  });
+
+  it("uses selectDistinct (one row per county, not per park)", () => {
+    expect(fnBody("getCountiesWithOpenParks")).toMatch(/selectDistinct/);
+  });
+});
+
+describe("getObstaclesWithOpenParks — generateStaticParams feed (phase 8)", () => {
+  it("filters status='open' on the joined parks side", () => {
+    expect(fnBody("getObstaclesWithOpenParks")).toMatch(
+      /eq\(parks\.status,\s*["']open["']\)/,
+    );
+  });
+
+  it("uses selectDistinct (one row per obstacle, not per row)", () => {
+    expect(fnBody("getObstaclesWithOpenParks")).toMatch(/selectDistinct/);
+  });
+
+  it("innerJoin parks on park_obstacles.park_id", () => {
+    expect(fnBody("getObstaclesWithOpenParks")).toMatch(
+      /innerJoin\(\s*parks,\s*eq\(parks\.id,\s*parkObstacles\.parkId\)/,
+    );
   });
 });
 

@@ -251,19 +251,95 @@ Drizzle config: two clients, one per connection mode. Server components import t
 
 ### Webhook → revalidate slug resolution (finding #3 — CRITICAL)
 
-Supabase Database Webhooks fire per-row with the row's payload. A `park_photos` INSERT carries `park_id` but NOT `slug`. `/api/revalidate` must accept any of the child-table payloads and resolve to the parent park's slug.
+Supabase Database Webhooks fire per-row with the row's payload. A `park_photos` INSERT carries `park_id` but NOT `slug`. `/api/revalidate` must accept any of the child-table payloads and resolve to the parent park's slug — AND to any taxonomy archive paths the park appears on.
 
-Pattern:
+#### Trigger paths (phase 8 plan-eng-review CMT-3A, codex #4 + #5)
+
+Phase 8 introduces taxonomy archive routes (`/county/<slug>`, `/obstacle/<slug>`) whose contents derive from `parks.county`, `park_obstacles`, and `park_photos`. Every revalidation that changes a park's identity or membership MUST also revalidate every archive path the park is on — both NEW and OLD (the latter when the field changed).
+
+The Supabase webhook payload shape supports this:
+
 ```ts
-// /api/revalidate POST body shape from Supabase Webhook
-// { type: 'INSERT'|'UPDATE'|'DELETE', table: 'parks'|'park_photos'|..., record: {...}, old_record: {...} }
-const parkId = body.record.park_id ?? body.record.id  // child tables have park_id, parks has id
-const { slug } = await db.select({ slug: parks.slug }).from(parks).where(eq(parks.id, parkId)).limit(1)
-if (slug) {
-  await revalidatePath(`/park/${slug}`)
+// { type: 'INSERT'|'UPDATE'|'DELETE', table: '<name>', record: {...}, old_record: {...} }
+```
+
+`old_record` is populated for UPDATE + DELETE (Supabase populates it from the table's REPLICA IDENTITY — verify it's set to FULL on parks + park_obstacles before launch; default is DEFAULT which only covers PK columns).
+
+| Table       | Operation         | Revalidate                                                                                          | Notes |
+|-------------|-------------------|-----------------------------------------------------------------------------------------------------|-------|
+| parks       | INSERT            | `/park/<new.slug>`, `/county/<new.county>` (if county set + open), `/obstacle/<each>` (if open)     | New park gains a profile + appears on its taxonomies. obstacles come from park_obstacles webhook firing separately, but if both webhook payloads are buffered they'd be redundant — fine. |
+| parks       | UPDATE            | `/park/<new.slug>`, `/park/<old.slug>` (if slug changed), `/county/<new.county>`, `/county/<old.county>` (if county changed), `/obstacle/<each>` (if status flipped open↔closed) | Status flip is the trigger to add/remove the park from EVERY archive it's tagged on. |
+| parks       | DELETE            | `/park/<old.slug>`, `/county/<old.county>`, `/obstacle/<each>` (query park_obstacles before delete) | Use old_record because the park row is gone. |
+| park_obstacles | INSERT         | `/park/<parks.slug>`, `/obstacle/<new.obstacle>`                                                    | Resolve parks.slug from new.park_id. New obstacle gains this park. |
+| park_obstacles | DELETE         | `/park/<parks.slug>`, `/obstacle/<old.obstacle>`                                                    | Resolve parks.slug from old.park_id. Old obstacle loses this park. |
+| park_photos  | INSERT/UPDATE/DELETE | `/park/<parks.slug>`, `/county/<parks.county>`, `/obstacle/<each>` (every obstacle on this park)  | Hero photo (sort_order = lowest) appears as thumbnail on NearbyCard in all 3 surfaces. Conservative: revalidate every taxonomy the park is on, even if a non-hero photo changed. |
+| park_links, park_amenities, park_renovations, park_riding_surfaces, park_builders | any | `/park/<parks.slug>` only | These don't appear on archives — only the profile. |
+
+#### Implementation pattern
+
+```ts
+// /api/revalidate POST handler — phase 9 implementation target
+const tbl = body.table
+const op = body.type
+const newRow = body.record
+const oldRow = body.old_record
+
+// 1. Resolve the affected park (slug + county + obstacles for taxonomy paths)
+const parkId = newRow.park_id ?? newRow.id ?? oldRow?.park_id ?? oldRow?.id
+const park = await db.select({
+  slug: parks.slug,
+  county: parks.county,
+  status: parks.status,
+}).from(parks).where(eq(parks.id, parkId)).limit(1).then((r) => r[0])
+
+// 2. Always revalidate the profile (it always exists or just got deleted)
+if (park) await revalidatePath(`/park/${park.slug}`)
+if (oldRow?.slug && oldRow.slug !== park?.slug) await revalidatePath(`/park/${oldRow.slug}`)
+
+// 3. Taxonomy archives — table-specific logic
+if (tbl === 'parks') {
+  // County change → revalidate both new + old
+  if (newRow.county) await revalidatePath(`/county/${slugForCounty(newRow.county)}`)
+  if (oldRow?.county && oldRow.county !== newRow.county) {
+    await revalidatePath(`/county/${slugForCounty(oldRow.county)}`)
+  }
+  // Status flip → every obstacle archive this park is on (open ↔ closed in/out)
+  if (oldRow?.status !== newRow.status) {
+    const obstacles = await db.select({ obstacle: parkObstacles.obstacle })
+      .from(parkObstacles).where(eq(parkObstacles.parkId, parkId))
+    for (const { obstacle } of obstacles) {
+      await revalidatePath(`/obstacle/${obstacleSlug(obstacle)}`)
+    }
+  }
+} else if (tbl === 'park_obstacles') {
+  // INSERT: new obstacle gains this park
+  if (newRow?.obstacle) await revalidatePath(`/obstacle/${obstacleSlug(newRow.obstacle)}`)
+  // DELETE: old obstacle loses this park — use old_record
+  if (oldRow?.obstacle && oldRow.obstacle !== newRow?.obstacle) {
+    await revalidatePath(`/obstacle/${obstacleSlug(oldRow.obstacle)}`)
+  }
+} else if (tbl === 'park_photos') {
+  // Photo change cascades: thumbnail on county + every obstacle archive
+  if (park?.county) await revalidatePath(`/county/${slugForCounty(park.county)}`)
+  const obstacles = await db.select({ obstacle: parkObstacles.obstacle })
+    .from(parkObstacles).where(eq(parkObstacles.parkId, parkId))
+  for (const { obstacle } of obstacles) {
+    await revalidatePath(`/obstacle/${obstacleSlug(obstacle)}`)
+  }
+}
+
+// 4. Observability — update last_revalidated_at on parks
+if (parkId && park) {
   await db.update(parks).set({ last_revalidated_at: new Date() }).where(eq(parks.id, parkId))
 }
 ```
+
+#### Pre-launch checklist
+
+- [ ] `ALTER TABLE parks REPLICA IDENTITY FULL` — otherwise old_record only has PK columns, breaks county-change + slug-change revalidations.
+- [ ] `ALTER TABLE park_obstacles REPLICA IDENTITY FULL` — for old.obstacle on DELETE.
+- [ ] Test phase 8 P2 TODO "Webhook fan-out integration test" — flip a park status open↔closed and assert all 3 affected URLs return cached HTML reflecting the change within ~5s.
+
 Configure one Supabase Webhook per table (parks, park_links, park_amenities, park_renovations, park_obstacles, park_riding_surfaces, park_photos, park_builders), all POSTing to the same `/api/revalidate` endpoint. Webhook retry-on-5xx is built-in.
 
 ### `/api/revalidate` and `/admin/lint` auth (finding #6 — CRITICAL)

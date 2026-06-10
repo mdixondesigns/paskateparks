@@ -14,7 +14,10 @@ import {
   parkRidingSurfaces,
   parks,
   shops,
+  type obstacleType,
 } from "@/db/schema";
+
+type ObstacleType = (typeof obstacleType.enumValues)[number];
 
 /**
  * Fetch a park by slug along with every child relation needed by the
@@ -279,4 +282,121 @@ export async function getAllParksForHomepage(): Promise<HomeParkRow[]> {
 
   const heroPhotos = await getHeroPhotoFor(rows.map((r) => r.id));
   return rows.map((r) => ({ ...r, heroPhotoPath: heroPhotos.get(r.id) ?? null }));
+}
+
+// ── Phase 8 — Taxonomy archives ─────────────────────────────────────────────
+
+/**
+ * Row shape served to /county/[slug] and /obstacle/[slug] page components.
+ * Mirrors HomeParkRow minus the lat/lng — taxonomy archives don't sort by
+ * distance, so coords are unnecessary client-side payload.
+ */
+export interface TaxonomyParkRow {
+  id: number;
+  slug: string;
+  name: string;
+  city: string;
+  state: string;
+  heroPhotoPath: string | null;
+}
+
+/**
+ * All OPEN parks in a given county, alpha by name, with hero photo joined.
+ *
+ *   parks ──┬─ status='open'
+ *           └─ county = displayName  (TEXT compare — case-sensitive against
+ *                                     Studio data; assertCountiesInData runs
+ *                                     at build time so drift can't sneak in)
+ *
+ * Caller passes the display-name form (e.g. "Bucks") — the route resolves
+ * URL slug → County via counties.ts.countyForSlug.
+ *
+ * status='open' filter mirrors getAllParksForHomepage / getAllParksForNearby:
+ * archives are discovery surfaces (D11), closed parks must not appear.
+ *
+ * Returns [] when no parks match — caller calls notFound() per locked phase
+ * 8 D4 (empty taxonomy = 404).
+ */
+export async function getParksByCounty(displayName: string): Promise<TaxonomyParkRow[]> {
+  const rows = await db
+    .select({
+      id: parks.id,
+      slug: parks.slug,
+      name: parks.name,
+      city: parks.city,
+      state: parks.state,
+    })
+    .from(parks)
+    .where(and(eq(parks.status, "open"), eq(parks.county, displayName)))
+    .orderBy(asc(parks.name));
+
+  if (rows.length === 0) return [];
+
+  const heroPhotos = await getHeroPhotoFor(rows.map((r) => r.id));
+  return rows.map((r) => ({ ...r, heroPhotoPath: heroPhotos.get(r.id) ?? null }));
+}
+
+/**
+ * All OPEN parks tagged with a given obstacle, alpha by name, hero photo joined.
+ *
+ *   park_obstacles (PK: park_id, obstacle)
+ *        │  INNER JOIN on park_id
+ *        ▼
+ *   parks ── status='open'
+ *
+ * Caller passes the ObstacleType enum value — the route resolves URL slug
+ * → enum via labels.ts.obstacleForSlug.
+ *
+ * Indexed by park_obstacles_obstacle_idx (phase 8 migration, CMT-6A) so
+ * filter-by-obstacle stays fast as the obstacle row count grows past the
+ * current ~150.
+ */
+export async function getParksByObstacle(
+  obstacle: ObstacleType,
+): Promise<TaxonomyParkRow[]> {
+  const rows = await db
+    .select({
+      id: parks.id,
+      slug: parks.slug,
+      name: parks.name,
+      city: parks.city,
+      state: parks.state,
+    })
+    .from(parks)
+    .innerJoin(parkObstacles, eq(parkObstacles.parkId, parks.id))
+    .where(and(eq(parks.status, "open"), eq(parkObstacles.obstacle, obstacle)))
+    .orderBy(asc(parks.name));
+
+  if (rows.length === 0) return [];
+
+  const heroPhotos = await getHeroPhotoFor(rows.map((r) => r.id));
+  return rows.map((r) => ({ ...r, heroPhotoPath: heroPhotos.get(r.id) ?? null }));
+}
+
+/**
+ * Distinct list of counties that currently have ≥1 open park. Feeds the
+ * /county/[slug] generateStaticParams call so empty-taxonomy archives are
+ * dropped from the static set (404 via dynamicParams=false).
+ */
+export async function getCountiesWithOpenParks(): Promise<string[]> {
+  const rows = await db
+    .selectDistinct({ county: parks.county })
+    .from(parks)
+    .where(and(eq(parks.status, "open"), isNotNull(parks.county)))
+    .orderBy(asc(parks.county));
+  return rows.map((r) => r.county).filter((c): c is string => c != null);
+}
+
+/**
+ * Distinct list of obstacles tagged on ≥1 open park. Feeds the
+ * /obstacle/[slug] generateStaticParams call.
+ */
+export async function getObstaclesWithOpenParks(): Promise<ObstacleType[]> {
+  const rows = await db
+    .selectDistinct({ obstacle: parkObstacles.obstacle })
+    .from(parkObstacles)
+    .innerJoin(parks, eq(parks.id, parkObstacles.parkId))
+    .where(eq(parks.status, "open"))
+    .orderBy(asc(parkObstacles.obstacle));
+  return rows.map((r) => r.obstacle);
 }

@@ -8,6 +8,13 @@
       "when": 1780542233937,
       "tag": "0000_initial_schema",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1781060639633,
+      "tag": "0003_taxonomy_indexes",
+      "breakpoints": true
     }
   ]
 }
