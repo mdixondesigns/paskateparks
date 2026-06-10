@@ -70,12 +70,52 @@ Captured by /plan-eng-review on 2026-05-30. Items the eng review surfaced but ex
 ### ~~Tile provider — migrate off OSM public tiles before launch~~
 **LANDED 2026-06-08** (session 5). Swapped `MapView.tsx` to CARTO Positron (`https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png`) + matching preconnect in `src/app/map/page.tsx`. Closed the OSM-policy risk AND the visual "too realistic / atlas-y" feel in one swap. No API key needed — CARTO's public basemap policy permits anonymous use up to ~75K mapviews/mo, which exceeds our P0 traffic expectation for launch. Attribution updated to credit both OSM contributors and CARTO. If we ever blow past the free tier, the same URL pattern keys via `?api_key=` (provisioned in the CARTO dashboard) — no architecture change.
 
+### Phase 9 webhook revalidate — taxonomy fan-out + REPLICA IDENTITY FULL
+**What:** Phase 9's `/api/revalidate` handler must revalidate not just `/park/<slug>` but also `/county/<slug>` and `/obstacle/<slug>` archives when the underlying data changes. Pre-launch: set `ALTER TABLE parks REPLICA IDENTITY FULL` and same for `park_obstacles` so the webhook payload includes `old_record` columns beyond the PK.
+**Why:** Without taxonomy fan-out, closing a park leaves it on `/county/<X>` until the next deploy — exactly the D11 trust regression phase 6 + 7 closed. Without REPLICA IDENTITY FULL, a county-change UPDATE can't revalidate the OLD `/county/<X>` because `old_record` is missing the county column.
+**Pros:** Full spec already written in [STACK-PIVOT.md §"Webhook → revalidate slug resolution"](STACK-PIVOT.md) — phase 9 implementation copies the pattern. 5 trigger paths (parks INSERT/UPDATE/DELETE, park_obstacles INSERT/DELETE, park_photos any) with concrete `revalidatePath` calls per case.
+**Cons:** Adds ~50 LOC to the `/api/revalidate` handler vs the minimal `/park/<slug>` version. Two DB lookups per webhook (resolve park, list obstacles) — fine, webhook traffic is owner-driven and bounded.
+**Context:** Tied to phase 8 (taxonomy archives shipped 2026-06-09) and phase 9 (webhook handler implementation). See STACK-PIVOT.md for the implementation pattern and the "Pre-launch checklist" of REPLICA IDENTITY ALTERs.
+**Depends on:** Phase 9 must precede launch — closed-park trust regression risk per D11.
+
 ---
 
 ## P2 — nice to have, defer to post-launch
 
 ### ~~Schema-sync tool for dev↔prod Airtable bases~~
 **RETIRED by Supabase pivot (E3).** Drizzle migrations are git-committed SQL files applied identically to both dev and prod Supabase projects via `supabase db push`. No drift possible.
+
+### /admin/lint orphan-county chip — surface parks whose county isn't in counties.ts
+**What:** When phase 9 builds the `/admin/lint` dashboard, add a chip that lists any park whose `county` value doesn't resolve in `src/lib/counties.ts`. Same shape as the existing data-quality chips planned for park_links malformed lines. Phase 8 already throws at build time via `assertCountiesInData` — this surfaces the same condition between deploys (Studio edit → before next deploy → owner-visible).
+**Why:** Build-time `assertCountiesInData` (locked phase 8 2A) catches drift on deploy, but until the owner ships a deploy, an orphaned park is invisible — it appears on `/park/<slug>` but no `/county/<X>` archive. Surfacing in `/admin/lint` closes that gap without forcing a deploy.
+**Pros:** Owner-friendly visibility of the drift the build-time check already catches. ~20 LOC in the lint dashboard.
+**Cons:** Requires `/admin/lint` to exist (phase 9 scope). Until then, the build-time check is the only gate — which is fine for ~weekly deploy cadence.
+**Context:** Phase 8 plan-eng-review CMT-3A produced this. Implementation: query `SELECT DISTINCT county FROM parks WHERE county IS NOT NULL` and call `assertCountiesInData(rows.map(r => r.county))` — catch the throw, surface the unknowns as a chip with a link to `src/lib/counties.ts`.
+**Depends on:** Phase 9 — `/admin/lint` dashboard.
+
+### Tighten assertCountiesInData to detect Studio case/whitespace drift
+**What:** `src/lib/counties.ts:assertCountiesInData` is whitespace + case tolerant (good for catching unknowns), but `src/lib/park-query.ts:getParksByCounty` does a case-sensitive `eq(parks.county, "Bucks")` lookup. If Studio data drifts to `"bucks"` or `"Bucks "`, the build assertion passes but the runtime query returns 0 rows → `/county/bucks` 404s with no signal. Extend the assertion to also throw on canonical-form mismatch (value present in map but not in exact case + trim form). Today's data is verified clean; this is a guard against future Studio edits.
+**Why:** Surfaces the failure mode at build time instead of silently 404-ing one of 14 archives.
+**Pros:** ~10 LOC + 1 test. Owner gets a loud build error pointing at the exact drift.
+**Cons:** Existing "tolerates case + whitespace" test in counties.test.ts becomes "rejects drift" — minor rewording.
+**Context:** Phase 8 ship-review P1 finding (Claude adversarial subagent). The orphan-county chip in `/admin/lint` (P2 above) would also surface this between deploys.
+**Depends on:** Nothing.
+
+### e2e JSON-LD parse validation
+**What:** `e2e/taxonomy.spec.ts` checks JSON-LD presence via `toHaveCount(2)` + `toContain("ItemList")` — passes even if the JSON is malformed (e.g. empty `<script></script>` or broken structure). Parse each script body with `JSON.parse` and validate required schema.org fields (`@context`, `@type`, `itemListElement` length matches park count).
+**Why:** Current assertions pass on shapes that wouldn't actually parse, missing real regressions.
+**Pros:** ~15 LOC. Real contract verification.
+**Cons:** None.
+**Context:** Phase 8 ship-review P2 finding (Claude adversarial subagent).
+**Depends on:** Nothing.
+
+### Per-archive custom intro copy — 14 counties + 38 obstacles
+**What:** Each `/county/<slug>` and `/obstacle/<slug>` archive currently uses a templated intro paragraph ("N open skateparks in X County, Pennsylvania, sorted alphabetically"). For SEO + reader value, replace with 1-3 sentences of owner-written copy per archive — local context for counties ("Philadelphia County is home to FDR, the most-photographed park in PA…"), trick context for obstacles ("Quarter pipes are the foundational ramp at most PA parks…").
+**Why:** Per CMT-4A (phase 8 plan-eng-review outside voice / codex #9), the current templated copy is "thin-programmatic-page territory" — Google may flag and downrank if all 52 archives share the same shape. Custom intro copy materially improves snippet quality and ranking on "<obstacle> spots in PA" / "<county> skateparks" long-tail searches.
+**Pros:** Direct SEO win on the queries phase 8 is built to capture. Adds content depth where Google rewards it.
+**Cons:** Content work, not technical — ~5 min × 52 archives = ~4-5 hours owner time. Schema needs a new `archive_intro_copy` field (or a new `taxonomy_intros` table keyed by `(kind, slug)` for forward-compat with park_type / riding_surface archives).
+**Context:** Phase 8 ships with the templated copy. JSON-LD + canonical + breadcrumb + 4 explicit 301s (CMT-2A, CMT-4A) are already in place — adding custom copy is the remaining SEO-depth win flagged in the codex review.
+**Depends on:** Owner content workflow. Suggest: add to the Airtable-style Studio view as a free-text field per taxonomy. Render the field when present, fall back to templated copy when null.
 
 ### Cost ceiling alerting
 **What:** Set alerts on Supabase Storage (1GB free), Supabase DB size (500MB free), Vercel Image source-image count (1000/mo Hobby cap), Upstash request count (10k/day free), Vercel bandwidth (100GB/mo free).

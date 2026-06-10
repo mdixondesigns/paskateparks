@@ -5,25 +5,46 @@ const config: NextConfig = {
   // WordPress served /park/<slug>/ — we 301 those to /park/<slug> via redirects() below.
   trailingSlash: false,
 
-  // A2 follow-up: redirect /park/<slug>/ → /park/<slug> to preserve SEO equity from
-  // the 47 live WP URLs. Phase 5 migration script populates the full slug list;
-  // until then the catch-all rule handles every WP-shaped trailing-slash park URL.
-  // TODO: replace catch-all with parks-table-driven generation once phase 5 lands.
+  // Phase 8 CMT-2A — WP taxonomy URL shapes 301 to the new shorter shape.
+  // Four explicit rules per taxonomy (with- and without- trailing slash)
+  // because next.config.ts redirects don't accept regex/optional segments.
+  //
+  //   /park/:slug/                       → /park/:slug                  (phase 5, A2)
+  //   /regions_and_counties/:slug/{,}    → /county/:slug                (phase 8)
+  //   /park_obstacles/:slug/{,}          → /obstacle/:slug              (phase 8)
+  //
+  // All permanent (301) — SEO equity transfers to the new URLs and Google
+  // de-indexes the old ones within a few weeks.
   async redirects() {
     return [
+      // Phase 5 trailing-slash strip for /park/<slug>/.
       {
         source: "/park/:slug/",
         destination: "/park/:slug",
         permanent: true,
       },
+
+      // Phase 8 county archive — WP /regions_and_counties/:slug → /county/:slug.
+      {
+        source: "/regions_and_counties/:slug",
+        destination: "/county/:slug",
+        permanent: true,
+      },
       {
         source: "/regions_and_counties/:slug/",
-        destination: "/regions_and_counties/:slug",
+        destination: "/county/:slug",
+        permanent: true,
+      },
+
+      // Phase 8 obstacle archive — WP /park_obstacles/:slug → /obstacle/:slug.
+      {
+        source: "/park_obstacles/:slug",
+        destination: "/obstacle/:slug",
         permanent: true,
       },
       {
         source: "/park_obstacles/:slug/",
-        destination: "/park_obstacles/:slug",
+        destination: "/obstacle/:slug",
         permanent: true,
       },
     ];
