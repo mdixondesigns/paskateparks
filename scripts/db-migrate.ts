@@ -56,11 +56,17 @@ async function main() {
   const sql = postgres(url, { max: 1, onnotice: () => {} });
 
   try {
+    // Create the tracking table if it doesn't exist, AND enable RLS on it
+    // so a fresh-DB bootstrap doesn't trip Supabase's rls_disabled_in_public
+    // advisor between the moment this script first runs and the moment
+    // 0001_rls.sql applies. ENABLE ROW LEVEL SECURITY is idempotent — re-runs
+    // on a table that already has it are a no-op.
     await sql.unsafe(`
       CREATE TABLE IF NOT EXISTS ${TRACKING_TABLE} (
         filename TEXT PRIMARY KEY,
         applied_at TIMESTAMPTZ NOT NULL DEFAULT now()
       );
+      ALTER TABLE ${TRACKING_TABLE} ENABLE ROW LEVEL SECURITY;
     `);
 
     const applied = new Set(
