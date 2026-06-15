@@ -336,11 +336,41 @@ if (parkId && park) {
 
 #### Pre-launch checklist
 
-- [ ] `ALTER TABLE parks REPLICA IDENTITY FULL` — otherwise old_record only has PK columns, breaks county-change + slug-change revalidations.
-- [ ] `ALTER TABLE park_obstacles REPLICA IDENTITY FULL` — for old.obstacle on DELETE.
-- [ ] Test phase 8 P2 TODO "Webhook fan-out integration test" — flip a park status open↔closed and assert all 3 affected URLs return cached HTML reflecting the change within ~5s.
+- [x] **Migration `0004_replica_identity_full.sql` (phase 9 1A — locked broader than original spec):** `ALTER TABLE … REPLICA IDENTITY FULL` on ALL 8 tables, not just `parks` + `park_obstacles`. Reason: three child tables (`park_renovations`, `park_links`, `park_photos`) have serial `id` PKs that don't include `park_id`, so DELETE webhooks would arrive with `old_record = {id: N}` and the resolver couldn't find the parent park. The composite-PK tables (`park_amenities`, `park_riding_surfaces`, `park_builders`, `park_obstacles`) work fine with DEFAULT replica identity but get FULL anyway for forward-proofing future fan-outs.
+- [ ] **Webhook fan-out integration test:** flip a park status open↔closed in Studio and assert all 3 affected URLs (`/park/<slug>`, `/county/<X>`, `/obstacle/<each>`) reflect the change within ~5s. Same for a park-photo replacement (cascades to `/`, `/map/`, `/county/<X>`, every `/obstacle/<Y>` the park is tagged on).
+- [ ] **Capture a real webhook payload to `e2e/fixtures/supabase-webhook-payload.json`** (CMT-13 outside voice) — INSERT, UPDATE, DELETE samples. The resolver tests use this fixture instead of a docs-assumed envelope shape.
 
-Configure one Supabase Webhook per table (parks, park_links, park_amenities, park_renovations, park_obstacles, park_riding_surfaces, park_photos, park_builders), all POSTing to the same `/api/revalidate` endpoint. Webhook retry-on-5xx is built-in.
+#### Phase 9 Supabase Webhooks setup — 8 webhooks, all to `/api/revalidate`
+
+Configure ONE webhook per table — eight total — all POSTing to `https://paskateparks.com/api/revalidate` with `Authorization: Bearer ${REVALIDATE_SECRET}` in the header. The resolver dispatches on `payload.table` to pick the right fan-out logic.
+
+| # | Table | Triggers | Why all three operations? |
+|---|---|---|---|
+| 1 | `parks` | INSERT, UPDATE, DELETE | Slug/county/status changes fan to /park, /county, /obstacle, /, /map. |
+| 2 | `park_obstacles` | INSERT, DELETE | Tagging change → /obstacle/<X>. Cascades from parks DELETE fire here. |
+| 3 | `park_photos` | INSERT, UPDATE, DELETE | Hero thumbnail cascades to / + /county + every /obstacle the park is on. |
+| 4 | `park_amenities` | INSERT, UPDATE, DELETE | Profile-only — affects /park/<slug>. |
+| 5 | `park_riding_surfaces` | INSERT, UPDATE, DELETE | Profile-only. |
+| 6 | `park_builders` | INSERT, UPDATE, DELETE | Profile-only. |
+| 7 | `park_renovations` | INSERT, UPDATE, DELETE | Profile-only. |
+| 8 | `park_links` | INSERT, UPDATE, DELETE | Profile-only. |
+
+Setup steps (per webhook):
+1. Supabase Dashboard → Database → Webhooks → Create webhook.
+2. **Name:** `paskateparks-revalidate-<table>` (so you can spot which is which in the failure-log UI).
+3. **Table:** select from the dropdown.
+4. **Events:** check INSERT + UPDATE + DELETE (all three).
+5. **Type:** HTTP Request.
+6. **Method:** POST.
+7. **URL:** `https://paskateparks.com/api/revalidate` (or your Vercel preview URL during testing).
+8. **HTTP Headers:** add `Authorization` = `Bearer <your REVALIDATE_SECRET>` and `Content-Type` = `application/json`.
+9. **Save.** Supabase fires the webhook on the next matching row change. Watch the webhook's deliveries log for 200 responses.
+
+**Cascade behavior to verify (CMT-2 outside voice):** when you DELETE a park, Postgres CASCADE-deletes its rows from `park_obstacles`, `park_links`, `park_amenities`, etc. Supabase Webhooks are AFTER triggers, so cascade-deleted rows DO fire their own DELETE webhooks. The resolver in `/api/revalidate` relies on this — the `parks` DELETE handler doesn't fan out to `/obstacle` archives because it knows the `park_obstacles` DELETE webhooks will. Manually test once: delete a test park and watch the webhook deliveries log to confirm cascade rows fire.
+
+**If even ONE webhook is missing**, the matching table's changes won't trigger revalidation — pages stay stale until next deploy. The `/admin/lint` stale-revalidate chip catches this post-hoc but pre-launch testing should verify all 8 fire.
+
+**Failure mode:** Supabase Webhooks have built-in retry on 5xx (3 attempts, exponential backoff). After max retries, the event is dropped silently. The `/admin/lint` stale-revalidate chip surfaces parks whose `last_revalidated_at` is older than 30 days — climbing count = drift somewhere in the pipeline.
 
 ### `/api/revalidate` and `/admin/lint` auth (finding #6 — CRITICAL)
 
