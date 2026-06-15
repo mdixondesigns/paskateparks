@@ -19,10 +19,18 @@ import * as schema from "./schema";
 // Supavisor in transaction mode (like PgBouncer) cannot reuse prepared
 // statements between connections. Without this flag you get
 // `prepared statement "X" already exists` / `does not exist` under load.
+//
+// `max: 3` (locked phase 9 8A): each Vercel lambda holds at most 3 Supabase
+// connections. Supabase free-tier Supavisor caps at ~60 connections. A bulk
+// Studio edit cascades 8 webhooks per parks row — at 6 concurrent lambdas
+// × 10 connections each (the old setting) we'd hit the cap and webhooks
+// would 503. With max:3 we get ~20 concurrent lambdas of headroom, which
+// covers the worst-case burst. The resolver only ever runs 2 sequential
+// queries per webhook, so 3 is plenty for steady-state.
 
 const pooledClient = postgres(dbEnv.DATABASE_URL, {
   prepare: false,
-  max: 10,
+  max: 3,
   idle_timeout: 20,
   connect_timeout: 10,
 });
