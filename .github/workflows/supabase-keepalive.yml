@@ -1,0 +1,75 @@
+# F1 — Free-tier Supabase auto-pause prevention.
+#
+# Supabase pauses free-tier projects after 7 days of zero database activity.
+# Once paused, the first query takes 10-30s to resume the compute, which
+# trips Supavisor's statement_timeout on routes like /admin/lint. Worst case:
+# the prod cutover hits a paused DB and the site loads slowly for the first
+# real visitors. STACK-PIVOT.md F1 specced this cron months ago — it was
+# missed during phase 1 setup and surfaced during phase 9 verification.
+#
+# Strategy: daily REST ping via the publishable (anon-equivalent) key.
+# We don't need an authenticated query — just any DB-touching request keeps
+# the compute warm. SELECT id LIMIT 1 against the parks table is the cheapest
+# possible signal that's still observable.
+#
+# Required GitHub Actions secrets (set via repo Settings → Secrets and variables → Actions):
+#   • SUPABASE_HOST_DEV               — e.g. djhuxetdljryleztkdrp.supabase.co
+#   • SUPABASE_PUBLISHABLE_KEY_DEV    — the sb_publishable_… key from .env.local
+#   • SUPABASE_HOST_PROD              — same shape, populated during phase 10 launch
+#   • SUPABASE_PUBLISHABLE_KEY_PROD   — same, phase 10
+#
+# Failure mode: if either ping fails (DB really down, key rotated, etc.), the
+# workflow run goes red and GitHub emails the repo owner. That's the alerting
+# mechanism — no separate monitoring needed.
+
+name: Supabase keepalive
+
+on:
+  schedule:
+    # 09:00 UTC = 05:00 EDT / 04:00 EST. Low-traffic window.
+    - cron: '0 9 * * *'
+  # Allow manual run from the GitHub Actions UI for testing.
+  workflow_dispatch:
+
+jobs:
+  ping-dev:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Ping dev Supabase
+        env:
+          HOST: ${{ secrets.SUPABASE_HOST_DEV }}
+          KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY_DEV }}
+        run: |
+          if [ -z "$HOST" ] || [ -z "$KEY" ]; then
+            echo "::warning::Missing SUPABASE_HOST_DEV or SUPABASE_PUBLISHABLE_KEY_DEV — skipping dev ping. Configure via repo Settings → Secrets and variables → Actions."
+            exit 0
+          fi
+          # --max-time 30 covers the 10-30s resume-from-pause window.
+          # --fail returns non-zero on HTTP 4xx/5xx so the workflow goes red.
+          curl --fail --silent --show-error --max-time 30 \
+            "https://$HOST/rest/v1/parks?select=id&limit=1" \
+            -H "apikey: $KEY" \
+            -H "Accept: application/json"
+          echo ""
+          echo "✓ dev keepalive OK"
+
+  ping-prod:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Ping prod Supabase
+        env:
+          HOST: ${{ secrets.SUPABASE_HOST_PROD }}
+          KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY_PROD }}
+        run: |
+          if [ -z "$HOST" ] || [ -z "$KEY" ]; then
+            echo "::warning::Missing SUPABASE_HOST_PROD or SUPABASE_PUBLISHABLE_KEY_PROD — skipping prod ping. (Expected pre-launch; configure during phase 10 cutover.)"
+            exit 0
+          fi
+          curl --fail --silent --show-error --max-time 30 \
+            "https://$HOST/rest/v1/parks?select=id&limit=1" \
+            -H "apikey: $KEY" \
+            -H "Accept: application/json"
+          echo ""
+          echo "✓ prod keepalive OK"
