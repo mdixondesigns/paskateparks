@@ -153,6 +153,8 @@ Captured by /plan-eng-review on 2026-05-30. Items the eng review surfaced but ex
 **Cons:** ~1 hour of test-writing.
 **Context:** Should run in CI nightly post-launch too. Worth a Playwright test that grabs `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` and tries every table.
 
+**Status 2026-06-15:** RLS is now enabled on **every** public-schema table (12 of 12 — see `scripts/check-rls.ts` for the live audit). The Supabase critical email dated 2026-06-08 closed out: the miss was the `__paskateparks_migrations` tracking table that `scripts/db-migrate.ts` created inline before `0001_rls.sql` could touch it. Fixed in migration `0005_enable_rls_tracking.sql` + db-migrate.ts now enables RLS at CREATE-TABLE time. **Still pending:** the audit Playwright test that exercises the publishable key against every table from anon and asserts denial — that's the real "audit" work this entry was scoped for. Trigger to ship: when the publishable key actually goes into the browser bundle (phase 10 or whenever we add client-side Supabase calls).
+
 ### Vercel Hobby commercial-use risk documentation
 **What:** Document the decision to use Vercel Hobby (E1) despite the commercial-use clause (paskateparks.com funnels to coaching business). Plan: if Vercel ever asks, upgrade to Pro $20/mo (~$240/yr — still cheaper than the old WP setup).
 **Why:** Decision should be retrievable later when someone asks "why aren't we on Pro?"
