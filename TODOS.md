@@ -16,12 +16,8 @@ Captured by /plan-eng-review on 2026-05-30. Items the eng review surfaced but ex
 **Context:** D29 already supports `Caption` and `Credit` on the Photos child table — alt text fits in there or a new `AltText` field. Render template should prefer `AltText`, fall back to `Caption`, fall back to auto-gen.
 **Depends on:** D4 migration complete (need records to author against).
 
-### 410 page body
-**What:** Design the page that renders behind D2's 410 status. Currently spec'd as bare 410 — Google ranks 410-with-content better than bare 410.
-**Why:** Stronger SEO signal, better UX for any human who hits the URL.
-**Pros:** Better de-indexing speed, optional CTA to the new directory.
-**Cons:** ~30 min of work.
-**Context:** Middleware can return a Response with HTML body. Suggest: "This page is permanently gone. [Browse parks](/) or [open the map](/map/)."
+### ~~410 page body~~
+**LANDED 2026-06-15** (phase 9). `src/proxy.ts` + `src/lib/retired-urls.ts` return a 410 with a simple HTML body for `/builder/*` and `/shop/*` ("This page is permanently gone. [Browse parks](/) or [open the map](/map/).") plus `X-Robots-Tag: noindex,nofollow`. Covered end-to-end by `e2e/middleware-410.spec.ts` (16 tests across the 8 retired-builder/shop slugs, bare /builder + /shop, unknown sub-slugs, header check, and non-interception of /park/<slug>, /county/<slug>, /obstacle/<slug>).
 
 ### iOS vs Android directions deep links
 **What:** Spec the UA-detection logic for "Get Directions" buttons. `geo:` URI doesn't work cleanly on iOS Safari — needs `maps://` or `https://maps.apple.com/?ll=`.
@@ -70,28 +66,26 @@ Captured by /plan-eng-review on 2026-05-30. Items the eng review surfaced but ex
 ### ~~Tile provider — migrate off OSM public tiles before launch~~
 **LANDED 2026-06-08** (session 5). Swapped `MapView.tsx` to CARTO Positron (`https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png`) + matching preconnect in `src/app/map/page.tsx`. Closed the OSM-policy risk AND the visual "too realistic / atlas-y" feel in one swap. No API key needed — CARTO's public basemap policy permits anonymous use up to ~75K mapviews/mo, which exceeds our P0 traffic expectation for launch. Attribution updated to credit both OSM contributors and CARTO. If we ever blow past the free tier, the same URL pattern keys via `?api_key=` (provisioned in the CARTO dashboard) — no architecture change.
 
-### Phase 9 webhook revalidate — taxonomy fan-out + REPLICA IDENTITY FULL
-**What:** Phase 9's `/api/revalidate` handler must revalidate not just `/park/<slug>` but also `/county/<slug>` and `/obstacle/<slug>` archives when the underlying data changes. Pre-launch: set `ALTER TABLE parks REPLICA IDENTITY FULL` and same for `park_obstacles` so the webhook payload includes `old_record` columns beyond the PK.
-**Why:** Without taxonomy fan-out, closing a park leaves it on `/county/<X>` until the next deploy — exactly the D11 trust regression phase 6 + 7 closed. Without REPLICA IDENTITY FULL, a county-change UPDATE can't revalidate the OLD `/county/<X>` because `old_record` is missing the county column.
-**Pros:** Full spec already written in [STACK-PIVOT.md §"Webhook → revalidate slug resolution"](STACK-PIVOT.md) — phase 9 implementation copies the pattern. 5 trigger paths (parks INSERT/UPDATE/DELETE, park_obstacles INSERT/DELETE, park_photos any) with concrete `revalidatePath` calls per case.
-**Cons:** Adds ~50 LOC to the `/api/revalidate` handler vs the minimal `/park/<slug>` version. Two DB lookups per webhook (resolve park, list obstacles) — fine, webhook traffic is owner-driven and bounded.
-**Context:** Tied to phase 8 (taxonomy archives shipped 2026-06-09) and phase 9 (webhook handler implementation). See STACK-PIVOT.md for the implementation pattern and the "Pre-launch checklist" of REPLICA IDENTITY ALTERs.
-**Depends on:** Phase 9 must precede launch — closed-park trust regression risk per D11.
+### ~~Phase 9 webhook revalidate — taxonomy fan-out + REPLICA IDENTITY FULL~~
+**LANDED 2026-06-15** (phase 9). `src/app/api/revalidate/route.ts` validates Bearer token + dispatches to `src/lib/revalidate-resolver.ts:resolvePaths` (extracted pure async function, 21 unit tests). Resolver also revalidates `/` and `/map/` on parks-table + photo changes (caught during T2 — spec missed it because phase 6/7 use `dynamic = "force-static"`). Migration `0004_replica_identity_full.sql` set REPLICA IDENTITY FULL on all 8 tables (not just parks + park_obstacles — serial-PK child tables don't expose `park_id` in old_record under DEFAULT, breaking DELETE fan-out). pg_class.relreplident = 'f' verified on all 8.
 
 ---
 
 ## P2 — nice to have, defer to post-launch
 
+### parks.last_revalidated_at write-amp mitigation
+**What:** Phase 9 ships with `/api/revalidate` bumping `parks.last_revalidated_at = now()` on every relevant webhook. With 8 Supabase Webhooks configured (one per table), a single Studio edit to one park can cascade up to 8 UPDATEs back to `parks`. A bulk-edit of 48 parks = ~384 writes. Switch to `UPDATE parks SET last_revalidated_at = now() WHERE id = $1 AND last_revalidated_at < now() - interval '60s'` (or `GREATEST(last_revalidated_at, now() - interval '60s')` pattern). Coalesces fanout-fire timestamps to one bump per 60-second window per park.
+**Why:** Hobby DB tier (500MB) handles current write volume easily — but the pattern is cosmetic write amplification that scales poorly as the directory grows past 150 parks. Cleaner write profile + identical semantics for the `/admin/lint` stale-revalidate chip.
+**Pros:** ~3 LOC + 1 unit test. Identical user-visible behavior. Cuts Supabase free-tier write volume in bulk-edit cases by ~8×.
+**Cons:** Premature optimization at v1 scale (48 parks). If never bites, the change is just code churn.
+**Context:** Phase 9 outside-voice CMT-11 (Claude adversarial). Mike chose 10A=A (defer to TODOS) so phase 9 ships with bump-on-every-webhook and the cosmetic mitigation lives here. Trigger to ship: when `/admin/lint` stale-revalidate chip starts false-firing (last_revalidated_at always fresh because of bulk-edit storms) OR Supabase free-tier write metrics climb past 70% of the 500MB DB ceiling.
+**Depends on:** Nothing — pure refactor.
+
 ### ~~Schema-sync tool for dev↔prod Airtable bases~~
 **RETIRED by Supabase pivot (E3).** Drizzle migrations are git-committed SQL files applied identically to both dev and prod Supabase projects via `supabase db push`. No drift possible.
 
-### /admin/lint orphan-county chip — surface parks whose county isn't in counties.ts
-**What:** When phase 9 builds the `/admin/lint` dashboard, add a chip that lists any park whose `county` value doesn't resolve in `src/lib/counties.ts`. Same shape as the existing data-quality chips planned for park_links malformed lines. Phase 8 already throws at build time via `assertCountiesInData` — this surfaces the same condition between deploys (Studio edit → before next deploy → owner-visible).
-**Why:** Build-time `assertCountiesInData` (locked phase 8 2A) catches drift on deploy, but until the owner ships a deploy, an orphaned park is invisible — it appears on `/park/<slug>` but no `/county/<X>` archive. Surfacing in `/admin/lint` closes that gap without forcing a deploy.
-**Pros:** Owner-friendly visibility of the drift the build-time check already catches. ~20 LOC in the lint dashboard.
-**Cons:** Requires `/admin/lint` to exist (phase 9 scope). Until then, the build-time check is the only gate — which is fine for ~weekly deploy cadence.
-**Context:** Phase 8 plan-eng-review CMT-3A produced this. Implementation: query `SELECT DISTINCT county FROM parks WHERE county IS NOT NULL` and call `assertCountiesInData(rows.map(r => r.county))` — catch the throw, surface the unknowns as a chip with a link to `src/lib/counties.ts`.
-**Depends on:** Phase 9 — `/admin/lint` dashboard.
+### ~~/admin/lint orphan-county chip — surface parks whose county isn't in counties.ts~~
+**LANDED 2026-06-15** (phase 9). `src/lib/lint-checks.ts:getOrphanCounties` runs `SELECT DISTINCT county FROM parks` and surfaces unresolved counties through the same chip dashboard. Ships alongside three other chips (stale revalidate >30d, missing coordinates, no photos) per 4A — all 4 chips shipped in v1. `getAllLintChips()` uses Promise.allSettled-style result so one failing query can't fail the whole dashboard.
 
 ### Tighten assertCountiesInData to detect Studio case/whitespace drift
 **What:** `src/lib/counties.ts:assertCountiesInData` is whitespace + case tolerant (good for catching unknowns), but `src/lib/park-query.ts:getParksByCounty` does a case-sensitive `eq(parks.county, "Bucks")` lookup. If Studio data drifts to `"bucks"` or `"Bucks "`, the build assertion passes but the runtime query returns 0 rows → `/county/bucks` 404s with no signal. Extend the assertion to also throw on canonical-form mismatch (value present in map but not in exact case + trim form). Today's data is verified clean; this is a guard against future Studio edits.
