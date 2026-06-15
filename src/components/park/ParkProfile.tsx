@@ -66,7 +66,9 @@ export function ParkProfile({ park, nearbyParks, nearbyShops }: Props) {
       <Builders builders={park.builders} />
       <ConnectSection links={park.links} />
       <SupportSection links={park.links} />
-      <SuggestEditButton parkSlug={park.slug} parkName={park.name} />
+      {park.status === "permanently_closed" ? null : (
+        <SuggestEditButton parkId={park.id} parkSlug={park.slug} parkName={park.name} />
+      )}
       <NearbyParks items={nearbyParks} />
       <NearbyShops items={nearbyShops} />
     </article>
