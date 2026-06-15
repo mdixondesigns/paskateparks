@@ -25,6 +25,7 @@
     "db:migrate:dry-run": "tsx scripts/db-migrate.ts --dry-run",
     "db:verify": "tsx scripts/db-verify.ts",
     "db:check-coords": "tsx scripts/check-park-coords.ts",
+    "db:check-rls": "tsx scripts/db-check-rls.ts",
     "db:seed-fdr": "tsx scripts/db-seed-fdr.ts",
     "db:studio": "drizzle-kit studio",
     "migrate-wp": "tsx scripts/migrate-wp.ts",
