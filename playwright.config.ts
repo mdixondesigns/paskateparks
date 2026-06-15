@@ -1,4 +1,10 @@
 import { defineConfig, devices } from "@playwright/test";
+import dotenv from "dotenv";
+
+// Load .env.local so tests can read ADMIN_PASSWORD/etc. The Next.js webServer
+// already loads .env.local on its own; this just makes the same values
+// available in the test runner's process.env for assertions and form fills.
+dotenv.config({ path: ".env.local" });
 
 const PORT = 3000;
 

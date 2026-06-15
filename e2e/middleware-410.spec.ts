@@ -124,4 +124,36 @@ test.describe("Phase 9 — /admin/* auth gate", () => {
     await page.getByRole("button", { name: /sign in/i }).click();
     await expect(page.getByText(/incorrect password/i)).toBeVisible({ timeout: 5_000 });
   });
+
+  // Regression guard for the full login -> cookie -> /admin/lint round-trip.
+  // Pre-2026-06-15 this was only exercised by humans; a Vercel deploy-window
+  // glitch surfaced the missing coverage. The chain is sign() in the server
+  // action, Set-Cookie on the 303, browser stores it, follows the redirect
+  // to /admin/lint, proxy.ts middleware calls verify(), accepts, page renders.
+  test("/admin/login with right password lands on /admin/lint", async ({
+    page,
+  }, testInfo) => {
+    // Login flow is browser-agnostic (HTML form + middleware HMAC verify, no
+    // browser-specific JS). Running on all 3 projects in parallel against
+    // pnpm dev causes Turbopack compile contention that pushes any single
+    // run past 30s. Pin to desktop-chromium — CI runs `pnpm start` on a
+    // pre-built bundle and would pass on any project, but keeping this on
+    // one project locally keeps the suite fast and deterministic.
+    test.skip(
+      testInfo.project.name !== "desktop-chromium",
+      "Login flow is browser-agnostic; covered on desktop-chromium only.",
+    );
+
+    const password = process.env.ADMIN_PASSWORD;
+    test.skip(!password, "ADMIN_PASSWORD not loaded — check playwright.config dotenv");
+
+    await page.goto("/admin/login");
+    await page.getByLabel(/password/i).fill(password!);
+    await page.getByRole("button", { name: /sign in/i }).click();
+
+    // 1s constant-time delay in loginAction + Turbopack first-compile
+    // of /admin/lint when running against pnpm dev.
+    await page.waitForURL(/\/admin\/lint$/, { timeout: 15_000 });
+    await expect(page.getByRole("heading", { name: /^data lint$/i })).toBeVisible();
+  });
 });
