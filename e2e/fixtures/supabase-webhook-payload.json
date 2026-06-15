@@ -1,0 +1,4 @@
+{
+  "_comment": "Real Supabase Database Webhook payloads, captured during phase 9 smoke testing. Each sample is the exact JSON body Supabase POSTs to /api/revalidate. revalidate-resolver.fixture.test.ts asserts each captured payload's shape so that if Supabase ever changes the envelope (or migration 0004 REPLICA IDENTITY FULL gets rolled back), we catch it loudly instead of silently dropping events. To capture: open Supabase Dashboard → Database → Webhooks → <hook-name> → Recent deliveries → click a delivery → copy the Payload JSON into the `payload` field of a new entry in `samples` below. Target three samples: one INSERT, one UPDATE, one DELETE.",
+  "samples": []
+}
