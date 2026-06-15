@@ -9,7 +9,22 @@ test.describe("Phase 1 scaffold — smoke", () => {
     ).toBeVisible();
   });
 
-  test("skip-link is reachable via Tab and points to #main (A6)", async ({ page }) => {
+  test("skip-link is reachable via Tab and points to #main (A6)", async ({
+    page,
+    browserName,
+  }) => {
+    // WebKit (Safari, iOS Safari) only includes form controls in the Tab
+    // cycle by default — links are skipped unless the user has enabled
+    // "Keyboard navigation" in macOS System Settings → Keyboard. That's a
+    // browser policy, not a site bug; a real Safari user with that setting on
+    // WILL Tab through to this link. The Tab-key assertion only makes sense
+    // on Chromium-derived engines, where Tab includes links unconditionally.
+    // Latent since phase 7 when the mobile-safari Playwright project was added.
+    test.skip(
+      browserName === "webkit",
+      "WebKit's default Tab cycle skips links — see comment for context.",
+    );
+
     await page.goto("/");
     await page.keyboard.press("Tab");
     const skipLink = page.getByRole("link", { name: /skip to main content/i });
