@@ -2,7 +2,8 @@ import "./globals.css";
 
 import type { Metadata } from "next";
 
-import { Footer } from "@/components/home/Footer";
+import { Footer } from "@/components/site/Footer";
+import { SiteHeader } from "@/components/site/SiteHeader";
 
 export const metadata: Metadata = {
   // Per-route titles override via `metadata` exports (homepage in src/app/page.tsx,
@@ -27,6 +28,7 @@ export default function RootLayout({
         >
           Skip to main content
         </a>
+        <SiteHeader />
         {children}
         <Footer />
       </body>
