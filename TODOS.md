@@ -81,6 +81,8 @@ Captured by /plan-eng-review on 2026-05-30. Items the eng review surfaced but ex
 **Context:** Phase 9 outside-voice CMT-11 (Claude adversarial). Mike chose 10A=A (defer to TODOS) so phase 9 ships with bump-on-every-webhook and the cosmetic mitigation lives here. Trigger to ship: when `/admin/lint` stale-revalidate chip starts false-firing (last_revalidated_at always fresh because of bulk-edit storms) OR Supabase free-tier write metrics climb past 70% of the 500MB DB ceiling.
 **Depends on:** Nothing — pure refactor.
 
+**Update 2026-06-15:** The recursive loop side-effect of this write pattern surfaced in production within 2 minutes of enabling the parks webhook — `/api/revalidate` writes `last_revalidated_at` → fires parks UPDATE webhook → re-enters resolver → writes `last_revalidated_at` → loop at ~1 req/sec. Fixed in `src/lib/revalidate-resolver.ts:onlyLastRevalidatedAtChanged` (short-circuit when only that column differs between old_record and record). The recursion is dead, but every legit revalidate still triggers one extra self-fire that the guard catches and discards. The 60-second-window mitigation above would eliminate that extra round-trip too; revised trigger to ship is "if Vercel /api/revalidate invocation count grows visibly larger than user-driven edits, indicating the loop-guard is firing too often."
+
 ### ~~Schema-sync tool for dev↔prod Airtable bases~~
 **RETIRED by Supabase pivot (E3).** Drizzle migrations are git-committed SQL files applied identically to both dev and prod Supabase projects via `supabase db push`. No drift possible.
 
