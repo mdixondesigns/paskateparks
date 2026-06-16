@@ -8,13 +8,8 @@ Captured by /plan-eng-review on 2026-05-30. Items the eng review surfaced but ex
 
 ## P1 — should ship with v1 or shortly after
 
-### Park description renders literal `<p>` tags (BUG)
-**What:** `src/components/park/Overview.tsx:21` renders the description with `<p className="mt-2">{park.description}</p>`. But `park.description` is HTML (raw migrated from WP, e.g. `"<p>When it comes to DIY...</p>\n\n<p>One of the things...</p>"` — confirmed from the captured webhook fixture). React string-escapes the angle brackets, so users see literal `<p>` and `</p>` text on every park profile page.
-**Why:** Visible bug on the live site (https://paskateparks.vercel.app/park/fdr). Every park profile is affected. Launch-blocking.
-**Pros:** One-line fix. Restores readable formatting on all 48 migrated parks.
-**Cons:** Requires `dangerouslySetInnerHTML` since the source is HTML, not a React tree. Safe in our context — descriptions are owner-curated via Studio, RLS denies anon writes, no untrusted-input path — but the helper name reads scary. Add a wrapping comment explaining the trust assumption.
-**Context:** Fix sketch: `<div className="prose mt-2" dangerouslySetInnerHTML={{ __html: park.description }} />`. Adding a `prose` class (or equivalent typography styles) restores Tailwind's typographic defaults for child `<p>`/`<a>`/`<ul>` tags. Alternative: sanitize/parse to a React tree via `html-react-parser` or `rehype` — heavier dep but avoids dangerouslySetInnerHTML. Test: assert that a sample HTML description renders an actual `<p>` element in the DOM, not a literal `&lt;p&gt;` text node.
-**Depends on:** Nothing.
+### ~~Park description renders literal `<p>` tags (BUG)~~
+**LANDED 2026-06-15.** `src/components/park/Overview.tsx:30-33` now uses `dangerouslySetInnerHTML` with a wrapping div carrying `mt-2 space-y-3 text-base leading-relaxed` Tailwind utilities. The `space-y-3` selector works on innerHTML children, so no `@tailwindcss/typography` dep was needed. Safety documented inline: descriptions are owner-authored via Studio, RLS is deny-all-anon on parks, no untrusted-input path writes the field. Regression suite at `src/components/park/Overview.test.tsx` (5 tests, 346 total) covers: HTML renders as DOM elements, no literal `<p>` text appears, section hides on empty content, inline `<a>` anchors preserved.
 
 ### Global header with logo, site title, and nav
 **What:** No site-wide header exists. `src/app/layout.tsx` has a skip-link explicitly commented as "visible on focus so keyboard users can bypass any future nav" (A6) — so the absence is acknowledged in code, just never implemented. Build a header with the wordmark/logo, "Pennsylvania Skateparks" title, and links to /map and /about. Sticky-or-not is a taste call; per VISUAL-DESIGN.md the warm-cream surface should host it cleanly without a divider until scroll.
