@@ -1,4 +1,103 @@
 {
-  "_comment": "Real Supabase Database Webhook payloads, captured during phase 9 smoke testing. Each sample is the exact JSON body Supabase POSTs to /api/revalidate. revalidate-resolver.fixture.test.ts asserts each captured payload's shape so that if Supabase ever changes the envelope (or migration 0004 REPLICA IDENTITY FULL gets rolled back), we catch it loudly instead of silently dropping events. To capture: open Supabase Dashboard → Database → Webhooks → <hook-name> → Recent deliveries → click a delivery → copy the Payload JSON into the `payload` field of a new entry in `samples` below. Target three samples: one INSERT, one UPDATE, one DELETE.",
-  "samples": []
+  "_comment": "Real Supabase Database Webhook payloads, captured 2026-06-15 from Vercel logs after enabling the 8 webhooks on the paskateparks-dev project. revalidate-resolver.fixture.test.ts asserts each captured payload's shape so that if Supabase ever changes the envelope (or migration 0004 REPLICA IDENTITY FULL gets rolled back), we catch it loudly instead of silently dropping events. To capture more samples: trigger the table change in Studio, then look in Vercel Logs for the `[revalidate] payload: ...` line and paste the JSON after `payload:` into a new samples[] entry.",
+  "samples": [
+    {
+      "label": "UPDATE parks - status permanently_closed -> open on FDR (id=2)",
+      "payload": {
+        "type": "UPDATE",
+        "table": "parks",
+        "schema": "public",
+        "record": {
+          "id": 2,
+          "fee": false,
+          "lat": 39.8984981,
+          "lng": -75.179744,
+          "zip": "19148",
+          "city": "Philadelphia",
+          "name": "FDR",
+          "slug": "fdr",
+          "hours": "April - October: 6:00am - 9:00pm, daily\r\nNovember - March: 6:00am - 6:00pm, daily",
+          "state": "PA",
+          "county": "Philadelphia",
+          "status": "open",
+          "helmets": "none_posted",
+          "park_type": "diy_park",
+          "created_at": "2026-06-06T13:18:09.945062+00:00",
+          "updated_at": "2026-06-06T13:27:02.69493+00:00",
+          "wp_post_id": 239,
+          "description": "<p>When it comes to DIY skate spots, FDR is the mecca. Whatever you're imagining in your head, this place is bigger; not just in square footage but the ramps are huge, fast and steep. Just outside the main park is smaller \"slappy\" street area by the parking lot with a bunch of goofy obstacles.</p>\n\n<p>One of the things that makes FDR so difficult to skate is that there’s no pre-defined flow. It’s like the park is what it is and you just have to deal with it. Another thing that’s tough is how much dead space there is in the middle of the park. You really need to be cruising to get from one side to the other without pushing.</p>",
+          "programming": false,
+          "allows_bikes": true,
+          "square_footage": 16000,
+          "street_address": "Pattison Ave",
+          "allows_scooters": true,
+          "established_year": 1995,
+          "status_changed_at": null,
+          "allows_skateboards": true,
+          "reopen_expected_at": null,
+          "last_revalidated_at": "2026-06-16T00:56:42.381+00:00",
+          "other_pads_required": false,
+          "vehicle_rules_notes": null,
+          "allows_roller_skates": true,
+          "riding_surface_notes": "There is often debris on the park when you show up. There are typically brooms available to clear the ramps.",
+          "riding_surface_photo_path": null
+        },
+        "old_record": {
+          "id": 2,
+          "fee": false,
+          "lat": 39.8984981,
+          "lng": -75.179744,
+          "zip": "19148",
+          "city": "Philadelphia",
+          "name": "FDR",
+          "slug": "fdr",
+          "hours": "April - October: 6:00am - 9:00pm, daily\r\nNovember - March: 6:00am - 6:00pm, daily",
+          "state": "PA",
+          "county": "Philadelphia",
+          "status": "permanently_closed",
+          "helmets": "none_posted",
+          "park_type": "diy_park",
+          "created_at": "2026-06-06T13:18:09.945062+00:00",
+          "updated_at": "2026-06-06T13:27:02.69493+00:00",
+          "wp_post_id": 239,
+          "description": "<p>When it comes to DIY skate spots, FDR is the mecca. Whatever you're imagining in your head, this place is bigger; not just in square footage but the ramps are huge, fast and steep. Just outside the main park is smaller \"slappy\" street area by the parking lot with a bunch of goofy obstacles.</p>\n\n<p>One of the things that makes FDR so difficult to skate is that there’s no pre-defined flow. It’s like the park is what it is and you just have to deal with it. Another thing that’s tough is how much dead space there is in the middle of the park. You really need to be cruising to get from one side to the other without pushing.</p>",
+          "programming": false,
+          "allows_bikes": true,
+          "square_footage": 16000,
+          "street_address": "Pattison Ave",
+          "allows_scooters": true,
+          "established_year": 1995,
+          "status_changed_at": null,
+          "allows_skateboards": true,
+          "reopen_expected_at": null,
+          "last_revalidated_at": "2026-06-16T00:56:42.381+00:00",
+          "other_pads_required": false,
+          "vehicle_rules_notes": null,
+          "allows_roller_skates": true,
+          "riding_surface_notes": "There is often debris on the park when you show up. There are typically brooms available to clear the ramps.",
+          "riding_surface_photo_path": null
+        }
+      }
+    },
+    {
+      "label": "INSERT park_obstacles - tagged FDR (id=2) with snake_run",
+      "payload": {
+        "type": "INSERT",
+        "table": "park_obstacles",
+        "schema": "public",
+        "record": { "park_id": 2, "obstacle": "snake_run" },
+        "old_record": null
+      }
+    },
+    {
+      "label": "DELETE park_obstacles - removed FDR's snake_run tag",
+      "payload": {
+        "type": "DELETE",
+        "table": "park_obstacles",
+        "schema": "public",
+        "record": null,
+        "old_record": { "park_id": 2, "obstacle": "snake_run" }
+      }
+    }
+  ]
 }
