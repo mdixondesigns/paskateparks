@@ -69,6 +69,13 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json({ error: "missing_envelope_fields" }, { status: 400 });
   }
 
+  // Structured log of the raw envelope — Vercel surfaces this on every
+  // /api/revalidate invocation. Two uses: (1) capturing real payloads into
+  // e2e/fixtures/supabase-webhook-payload.json (T16), (2) diagnosing future
+  // webhook misbehavior without needing to re-instrument the route. Payload
+  // is small (≤2KB even with REPLICA IDENTITY FULL on the largest table).
+  console.log(`[revalidate] payload: ${JSON.stringify(payload)}`);
+
   // 3. Resolve the affected paths.
   const result = await resolvePaths(payload, dbPooled);
 
