@@ -2,7 +2,12 @@ import { describe, expect, it, vi } from "vitest";
 
 import { parks } from "@/db/schema";
 
-import { resolvePaths, type ResolverDb, type WebhookPayload } from "./revalidate-resolver";
+import {
+  onlyLastRevalidatedAtChanged,
+  resolvePaths,
+  type ResolverDb,
+  type WebhookPayload,
+} from "./revalidate-resolver";
 
 // Test fixture builder. The resolver makes one or two DB calls:
 //
@@ -330,5 +335,108 @@ describe("resolvePaths — edge cases", () => {
     // make sense because *something* in parks changed; we add them as a safety net.
     expect(result.paths).toEqual(expect.arrayContaining(["/", "/map"]));
     expect(result.paths.filter((p) => p.startsWith("/park/"))).toEqual([]);
+  });
+});
+
+// Loop-guard: regression suite for the 2026-06-15 production incident. Without
+// these, a parks UPDATE whose only changed column is last_revalidated_at would
+// re-enter the resolver, fan out, write last_revalidated_at again — recursive
+// at ~1 req/sec until the webhook is disabled. See onlyLastRevalidatedAtChanged
+// in revalidate-resolver.ts for the predicate, and the parks UPDATE short-circuit
+// at the top of that branch for the wiring.
+describe("onlyLastRevalidatedAtChanged predicate", () => {
+  it("returns true when only last_revalidated_at differs", () => {
+    const oldRow = {
+      id: 42,
+      slug: "fdr",
+      county: "Philadelphia",
+      status: "open",
+      last_revalidated_at: "2026-06-15T20:00:00Z",
+    };
+    const newRow = { ...oldRow, last_revalidated_at: "2026-06-15T20:39:07Z" };
+    expect(onlyLastRevalidatedAtChanged(oldRow, newRow)).toBe(true);
+  });
+
+  it("returns false when last_revalidated_at AND status differ", () => {
+    const oldRow = {
+      id: 42,
+      slug: "fdr",
+      county: "Philadelphia",
+      status: "open",
+      last_revalidated_at: "2026-06-15T20:00:00Z",
+    };
+    const newRow = { ...oldRow, status: "closed", last_revalidated_at: "2026-06-15T20:39:07Z" };
+    expect(onlyLastRevalidatedAtChanged(oldRow, newRow)).toBe(false);
+  });
+
+  it("returns false when only a non-timestamp column changed", () => {
+    const oldRow = { id: 42, slug: "fdr", status: "open" };
+    const newRow = { id: 42, slug: "fdr", status: "closed" };
+    expect(onlyLastRevalidatedAtChanged(oldRow, newRow)).toBe(false);
+  });
+
+  it("returns false when the rows are identical (no change at all)", () => {
+    const row = { id: 42, slug: "fdr", last_revalidated_at: "2026-06-15T20:00:00Z" };
+    expect(onlyLastRevalidatedAtChanged(row, { ...row })).toBe(false);
+  });
+
+  it("treats numeric-string vs number as equal (Supabase int/bigint serialization)", () => {
+    const oldRow = { id: 42, status: "open", last_revalidated_at: "a" };
+    const newRow = { id: "42", status: "open", last_revalidated_at: "b" };
+    expect(onlyLastRevalidatedAtChanged(oldRow, newRow)).toBe(true);
+  });
+
+  it("returns false when a column appears in one row but not the other (real schema diff)", () => {
+    const oldRow = { id: 42, last_revalidated_at: "a" };
+    const newRow = { id: 42, slug: "fdr", last_revalidated_at: "b" };
+    expect(onlyLastRevalidatedAtChanged(oldRow, newRow)).toBe(false);
+  });
+});
+
+describe("resolvePaths — parks UPDATE loop-guard", () => {
+  it("short-circuits when only last_revalidated_at changed", async () => {
+    const baseRow = {
+      id: 42,
+      slug: "fdr",
+      county: "Philadelphia",
+      status: "open",
+    };
+    const payload: WebhookPayload = {
+      type: "UPDATE",
+      table: "parks",
+      record: { ...baseRow, last_revalidated_at: "2026-06-15T20:39:07Z" },
+      old_record: { ...baseRow, last_revalidated_at: "2026-06-15T20:00:00Z" },
+    };
+    const result = await resolvePaths(payload, noDb);
+    expect(result.paths).toEqual([]);
+    expect(result.parkIdForTimestamp).toBeNull();
+    expect(result.warnings).toContainEqual(expect.stringMatching(/loop-guard/));
+  });
+
+  it("does NOT short-circuit when status also changed (normal fan-out applies)", async () => {
+    const payload: WebhookPayload = {
+      type: "UPDATE",
+      table: "parks",
+      record: {
+        id: 42,
+        slug: "fdr",
+        county: "Philadelphia",
+        status: "closed",
+        last_revalidated_at: "2026-06-15T20:39:07Z",
+      },
+      old_record: {
+        id: 42,
+        slug: "fdr",
+        county: "Philadelphia",
+        status: "open",
+        last_revalidated_at: "2026-06-15T20:00:00Z",
+      },
+    };
+    const db = fakeDb({ obstacles: [] });
+    const result = await resolvePaths(payload, db);
+    expect(result.paths).toEqual(
+      expect.arrayContaining(["/park/fdr", "/county/philadelphia", "/", "/map"]),
+    );
+    expect(result.parkIdForTimestamp).toBe(42);
   });
 });
