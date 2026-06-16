@@ -8,6 +8,30 @@ Captured by /plan-eng-review on 2026-05-30. Items the eng review surfaced but ex
 
 ## P1 — should ship with v1 or shortly after
 
+### Park description renders literal `<p>` tags (BUG)
+**What:** `src/components/park/Overview.tsx:21` renders the description with `<p className="mt-2">{park.description}</p>`. But `park.description` is HTML (raw migrated from WP, e.g. `"<p>When it comes to DIY...</p>\n\n<p>One of the things...</p>"` — confirmed from the captured webhook fixture). React string-escapes the angle brackets, so users see literal `<p>` and `</p>` text on every park profile page.
+**Why:** Visible bug on the live site (https://paskateparks.vercel.app/park/fdr). Every park profile is affected. Launch-blocking.
+**Pros:** One-line fix. Restores readable formatting on all 48 migrated parks.
+**Cons:** Requires `dangerouslySetInnerHTML` since the source is HTML, not a React tree. Safe in our context — descriptions are owner-curated via Studio, RLS denies anon writes, no untrusted-input path — but the helper name reads scary. Add a wrapping comment explaining the trust assumption.
+**Context:** Fix sketch: `<div className="prose mt-2" dangerouslySetInnerHTML={{ __html: park.description }} />`. Adding a `prose` class (or equivalent typography styles) restores Tailwind's typographic defaults for child `<p>`/`<a>`/`<ul>` tags. Alternative: sanitize/parse to a React tree via `html-react-parser` or `rehype` — heavier dep but avoids dangerouslySetInnerHTML. Test: assert that a sample HTML description renders an actual `<p>` element in the DOM, not a literal `&lt;p&gt;` text node.
+**Depends on:** Nothing.
+
+### Global header with logo, site title, and nav
+**What:** No site-wide header exists. `src/app/layout.tsx` has a skip-link explicitly commented as "visible on focus so keyboard users can bypass any future nav" (A6) — so the absence is acknowledged in code, just never implemented. Build a header with the wordmark/logo, "Pennsylvania Skateparks" title, and links to /map and /about. Sticky-or-not is a taste call; per VISUAL-DESIGN.md the warm-cream surface should host it cleanly without a divider until scroll.
+**Why:** Users on /park/<slug>, /county/<X>, /obstacle/<Y>, or /map have no clear way to navigate to other top-level sections. Today the only navigation is footer links. Launch-blocking IA.
+**Pros:** Closes the navigation gap; gives the wordmark a permanent home; makes the skip-link meaningful (it currently jumps over nothing). Unblocks #4 below — once we have a header, breadcrumbs slot in beneath it consistently.
+**Cons:** Touches every page render. Must respect VISUAL-DESIGN.md spacing scale + the cream/ink palette. Affects above-the-fold LCP on the homepage (D6 list-first); keep the markup minimal so it doesn't push the first park card below the fold on mobile.
+**Context:** A new component `src/components/site/SiteHeader.tsx` imported once from `layout.tsx`. Mobile spec: hamburger or inline links? Per DESIGN.md mobile-first principle, two inline links (/map, /about) keep it simple and avoid the hamburger-discoverability problem. Read VISUAL-DESIGN.md before designing — the wordmark treatment, divider system, and colors are locked there.
+**Depends on:** Nothing.
+
+### Park profile breadcrumbs (back to listing)
+**What:** /park/<slug> pages have no clear way back to the directory. Reuse the existing breadcrumb component pattern from `src/app/county/[slug]/page.tsx:113` (`<nav aria-label="Breadcrumb">` + `breadcrumbJsonLd` for SEO).
+**Why:** Users land on a park profile (from search, social share, /map/ popup, or /county/<X>) and have no obvious "back to the directory" affordance besides the browser back button. Trust + IA gap; launch-blocking.
+**Pros:** Reuses existing breadcrumb infrastructure — code, schema.org JSON-LD, ARIA labelling all already exist. Likely <30 LOC delta.
+**Cons:** Breadcrumb format question: linear (`Home › <Park Name>`), county-rooted (`Home › <County> › <Park Name>`), or obstacle-aware (multi-tag — which one wins?). Linear is simplest and matches the user's mental model of "this is one park in the directory."
+**Context:** Render between the (forthcoming) site header and the park's hero block. Schema.org BreadcrumbList JSON-LD piggybacks on the existing `breadcrumbJsonLd` helper.
+**Depends on:** Nothing (county breadcrumb pattern can be lifted directly). Visually composes well once the SiteHeader lands.
+
 ### Alt-text strategy for migrated photos
 **What:** Decide ownership for backfilling alt text on ~1500 photos migrated from WP. Auto-generated `"FDR Skatepark photo 3"` per D29 fails WCAG 1.1.1 meaningfully and is bad SEO snippet material.
 **Why:** Accessibility compliance + Google image search. Audit confirmed 0/20 sampled WP photos have alt text.
@@ -72,6 +96,22 @@ Captured by /plan-eng-review on 2026-05-30. Items the eng review surfaced but ex
 ---
 
 ## P2 — nice to have, defer to post-launch
+
+### Park photo lightbox / thumbnail expansion
+**What:** The horizontal photo strip on /park/<slug> (`src/components/park/PhotoStrip.tsx`) renders thumbnails but clicking one does nothing. Wire each thumbnail to open a modal/lightbox with the full-resolution version, keyboard-navigable (←/→ between photos, Esc to close), with caption + credit if present.
+**Why:** Without expansion, the thumbnails read as decoration rather than browseable content. Skateparks are a visual product — parents and skaters want to actually see the park before driving 40 minutes.
+**Pros:** Significant UX upgrade for the photo-heavy parks (FDR has the most-photographed park in PA per CMT-4A). Implementations are well-understood — many ready-made libraries.
+**Cons:** New dependency OR client-side complexity. Mobile lightbox UX (pinch-to-zoom, swipe between, body-scroll-lock) has known gotchas. Adds JS bundle weight to /park/<slug>, which is the LCP-sensitive page.
+**Context:** Three options ranked by effort: (1) HTML5 `<dialog>` element + a small client component, ~50 LOC, zero deps, basic UX (no swipe between, no pinch-zoom). (2) `react-photo-album` or `yet-another-react-lightbox` — opinionated, ~30KB gz, full-featured. (3) Headless UI (`@headlessui/react Dialog`) + custom — middle ground. Given we ship Tailwind already and Headless UI is the canonical Tailwind partner, (3) is the natural fit. Caption + credit fields are already on `park_photos` per D29.
+**Depends on:** Nothing.
+
+### Homepage shows "Showing N parks" by default (not just after geolocation)
+**What:** `src/components/home/HomeParkList.tsx:148-154` computes a status string that's only non-empty after the user grants geolocation ("Showing 45 parks nearest to you.") OR types in the filter input ("Showing 12 parks matching 'philly'."). With neither — the default page-load state — the status is `""`, so users get no count signal at all. Add an else branch: `\`Showing ${countLabel}.\`` (e.g., "Showing 150 parks.").
+**Why:** Friendly orientation — users see "Pennsylvania has 150 skateparks, here's all of them" before they decide to filter or sort. Currently the page just shows the list with no header context, which feels incomplete. Also reinforces the directory's scale (150+ parks is the value prop).
+**Pros:** ~3 LOC change at `HomeParkList.tsx:152` (replace the `""` fallback). No new components, no design questions.
+**Cons:** Status visually duplicates information the user can also infer from the list length. But "150 parks" as a number lands faster than visually scanning the rendered card count.
+**Context:** Use the existing `pluralize(items.length, "park")` helper one line up. Should the count change when filter is active but no location? It already does ("Showing 12 parks matching '...'."). The only gap is the no-filter + no-location case. Existing test at `HomeParkList.test.tsx:164` covers the geolocation branch — extend with a "no location, no filter" assertion.
+**Depends on:** Nothing.
 
 ### parks.last_revalidated_at write-amp mitigation
 **What:** Phase 9 ships with `/api/revalidate` bumping `parks.last_revalidated_at = now()` on every relevant webhook. With 8 Supabase Webhooks configured (one per table), a single Studio edit to one park can cascade up to 8 UPDATEs back to `parks`. A bulk-edit of 48 parks = ~384 writes. Switch to `UPDATE parks SET last_revalidated_at = now() WHERE id = $1 AND last_revalidated_at < now() - interval '60s'` (or `GREATEST(last_revalidated_at, now() - interval '60s')` pattern). Coalesces fanout-fire timestamps to one bump per 60-second window per park.
