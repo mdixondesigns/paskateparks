@@ -124,6 +124,28 @@ export async function resolvePaths(
   const oldRow = payload.old_record ?? null;
 
   if (payload.table === "parks") {
+    // Loop-guard. /api/revalidate writes back to parks.last_revalidated_at on
+    // every successful revalidation. That write fires the parks UPDATE webhook
+    // again, which would re-enter this resolver, fan out, and write_revalidated_at
+    // again — a self-sustaining loop at ~1 req/sec. Surfaced in production
+    // 2026-06-15 when the parks webhook was first wired up.
+    //
+    // If the ONLY column that differs between old_record and record is
+    // last_revalidated_at, the UPDATE was triggered by our own write-back —
+    // there's nothing user-visible to revalidate. Return empty paths and skip
+    // the timestamp bump so the loop terminates after one extra round-trip.
+    if (
+      payload.type === "UPDATE" &&
+      newRow &&
+      oldRow &&
+      onlyLastRevalidatedAtChanged(oldRow, newRow)
+    ) {
+      warnings.push(
+        `loop-guard: parks UPDATE id=${asInt(newRow.id) ?? "?"} only changed last_revalidated_at — skipping fan-out`,
+      );
+      return { paths: [], parkIdForTimestamp: null, warnings };
+    }
+
     // Site-wide discovery surfaces — homepage list + map — depend on the full
     // open-parks list, so any parks-row change fans out to both.
     paths.add("/");
@@ -270,4 +292,47 @@ function asInt(value: unknown): number | null {
     if (Number.isFinite(n)) return Math.trunc(n);
   }
   return null;
+}
+
+/**
+ * Loop-guard predicate. Returns true when `record` differs from `old_record`
+ * ONLY in last_revalidated_at — the column /api/revalidate writes back on
+ * every webhook delivery. Without this guard, the parks UPDATE webhook would
+ * recursively re-fire on its own write-back at ~1/sec forever.
+ *
+ * REPLICA IDENTITY FULL on parks (migration 0004) means both records carry
+ * every column, so we can do a strict key-by-key comparison. We treat missing
+ * keys as null to be safe against the schema gaining new columns Supabase
+ * decides to omit when null.
+ *
+ * Exported for direct unit testing.
+ */
+export function onlyLastRevalidatedAtChanged(
+  oldRow: Record<string, unknown>,
+  newRow: Record<string, unknown>,
+): boolean {
+  const keys = new Set<string>([...Object.keys(oldRow), ...Object.keys(newRow)]);
+  let timestampDiffered = false;
+  for (const key of keys) {
+    const a = oldRow[key] ?? null;
+    const b = newRow[key] ?? null;
+    if (key === "last_revalidated_at") {
+      if (a !== b) timestampDiffered = true;
+      continue;
+    }
+    // Loose equality for unknown shapes (numbers vs string-encoded numbers from
+    // some Supabase JSON serializers, etc.). Strict equality would over-trigger.
+    if (!shallowEqual(a, b)) return false;
+  }
+  return timestampDiffered;
+}
+
+function shallowEqual(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (a == null || b == null) return false;
+  // Treat numeric-string vs number as equal: Supabase serializes ints as JS
+  // numbers but bigints / numerics may come through as strings.
+  if (typeof a === "number" && typeof b === "string") return String(a) === b;
+  if (typeof a === "string" && typeof b === "number") return a === String(b);
+  return false;
 }
