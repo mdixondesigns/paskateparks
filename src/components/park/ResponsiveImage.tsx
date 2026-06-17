@@ -34,7 +34,7 @@ export interface ResponsiveImageProps {
   className?: string;
 }
 
-function buildUrl(storagePath: string, width: number): string {
+export function buildPhotoUrl(storagePath: string, width: number): string {
   return `${publicEnv.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${storagePath}@${width}w.jpg`;
 }
 
@@ -48,10 +48,10 @@ export function ResponsiveImage({
   height,
   className,
 }: ResponsiveImageProps) {
-  const srcset = WIDTHS.map((w) => `${buildUrl(storagePath, w)} ${w}w`).join(", ");
+  const srcset = WIDTHS.map((w) => `${buildPhotoUrl(storagePath, w)} ${w}w`).join(", ");
   // Use 800w as the <img src> fallback — most "average" size; the browser's
   // srcset selection will override on render based on viewport.
-  const fallback = buildUrl(storagePath, 800);
+  const fallback = buildPhotoUrl(storagePath, 800);
   return (
     // eslint-disable-next-line @next/next/no-img-element -- deliberate per STACK-PIVOT.md F2: pre-resized Supabase JPEGs served via plain <img srcset>, NOT next/image.
     <img
