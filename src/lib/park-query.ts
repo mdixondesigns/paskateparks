@@ -240,6 +240,7 @@ export interface HomeParkRow {
   id: number;
   slug: string;
   name: string;
+  alias: string | null;
   city: string;
   state: string;
   lat: number | null;
@@ -264,6 +265,7 @@ export async function getAllParksForHomepage(): Promise<HomeParkRow[]> {
       id: parks.id,
       slug: parks.slug,
       name: parks.name,
+      alias: parks.alias,
       city: parks.city,
       state: parks.state,
       lat: parks.lat,

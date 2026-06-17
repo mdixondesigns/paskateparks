@@ -137,6 +137,10 @@ export const parks = pgTable(
     county: text("county"),
     streetAddress: text("street_address"),
     zip: text("zip"),
+    // Unofficial / local name. "Wawa Park" for Robert E. Lambert, "4th Street"
+    // for Carl W. Saldutti, etc. Surfaced under the H1 and matched in the
+    // homepage search filter so locals can find parks by either name.
+    alias: text("alias"),
     // lat/lng nullable: 99 stub parks don't have coords yet. Render-time:
     // NULL coords → excluded from /map/ + Nearby compute, profile still renders.
     lat: doublePrecision("lat"),

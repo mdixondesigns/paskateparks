@@ -30,11 +30,11 @@ afterEach(() => {
 
 const PARKS: HomeParkRow[] = [
   // alpha order: 9th, Bayne, FDR, Granahan, Pittsburgh, Wallenpaupack, Zembo
-  { id: 1, slug: "9th-and-poplar", name: "9th and Poplar", city: "Philadelphia", state: "PA", lat: 39.96, lng: -75.15, heroPhotoPath: "parks/9th/photo-01" },
-  { id: 2, slug: "bayne-skatepark", name: "Bayne Skatepark", city: "Bellevue", state: "PA", lat: 40.5, lng: -80.05, heroPhotoPath: "parks/bayne/photo-01" },
-  { id: 3, slug: "fdr", name: "FDR Skatepark", city: "Philadelphia", state: "PA", lat: 39.91, lng: -75.18, heroPhotoPath: "parks/fdr/photo-01" },
-  { id: 4, slug: "granahan", name: "Granahan", city: "Philadelphia", state: "PA", lat: 39.97, lng: -75.21, heroPhotoPath: null },
-  { id: 5, slug: "wallenpaupack-skatepark", name: "Wallenpaupack Skatepark", city: "Hawley", state: "PA", lat: 41.47, lng: -75.18, heroPhotoPath: null },
+  { id: 1, slug: "9th-and-poplar", name: "9th and Poplar", alias: null, city: "Philadelphia", state: "PA", lat: 39.96, lng: -75.15, heroPhotoPath: "parks/9th/photo-01" },
+  { id: 2, slug: "bayne-skatepark", name: "Bayne Skatepark", alias: "Bellevue Skate Plaza", city: "Bellevue", state: "PA", lat: 40.5, lng: -80.05, heroPhotoPath: "parks/bayne/photo-01" },
+  { id: 3, slug: "fdr", name: "FDR Skatepark", alias: null, city: "Philadelphia", state: "PA", lat: 39.91, lng: -75.18, heroPhotoPath: "parks/fdr/photo-01" },
+  { id: 4, slug: "granahan", name: "Granahan", alias: null, city: "Philadelphia", state: "PA", lat: 39.97, lng: -75.21, heroPhotoPath: null },
+  { id: 5, slug: "wallenpaupack-skatepark", name: "Wallenpaupack Skatepark", alias: null, city: "Hawley", state: "PA", lat: 41.47, lng: -75.18, heroPhotoPath: null },
 ];
 
 function installGeolocation(coords: { latitude: number; longitude: number } | "deny") {
@@ -111,6 +111,17 @@ describe("HomeParkList", () => {
       });
       const items = screen.getAllByRole("listitem");
       expect(items).toHaveLength(3); // 9th, FDR, Granahan
+    });
+
+    it("matches against alias so locals can find parks by nickname", () => {
+      // Bayne's alias is "Bellevue Skate Plaza" — typing "bellevue skate" should hit it.
+      render(<HomeParkList parks={PARKS} />);
+      fireEvent.change(screen.getByPlaceholderText(/filter by name or city/i), {
+        target: { value: "bellevue skate" },
+      });
+      const items = screen.getAllByRole("listitem");
+      expect(items).toHaveLength(1);
+      expect(items[0]?.textContent).toContain("Bayne Skatepark");
     });
 
     it("shows an empty state when the filter matches zero parks", () => {

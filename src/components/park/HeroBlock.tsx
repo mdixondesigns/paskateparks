@@ -30,6 +30,9 @@ export function HeroBlock({ park }: Props) {
         {park.city}, {park.state}
       </p>
       <h1 className="mt-1 text-3xl font-bold">{park.name}</h1>
+      {park.alias ? (
+        <p className="mt-1 text-sm italic text-neutral-600">Also known as {park.alias}</p>
+      ) : null}
       <div className="mt-2 flex flex-wrap items-baseline gap-3 text-sm">
         {park.establishedYear ? (
           <span aria-label={`Established ${park.establishedYear}`}>

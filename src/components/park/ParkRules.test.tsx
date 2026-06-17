@@ -20,6 +20,7 @@ function makePark(overrides: Partial<ParkWithRelations>): ParkWithRelations {
     county: null,
     streetAddress: null,
     zip: null,
+    alias: null,
     lat: null,
     lng: null,
     hours: null,

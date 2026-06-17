@@ -26,6 +26,7 @@ function makeFullPark(): ParkWithRelations {
     county: "Allegheny",
     streetAddress: "123 Test Ave",
     zip: "15201",
+    alias: null,
     lat: 40.4406,
     lng: -79.9959,
     hours: "9am to 9pm",
