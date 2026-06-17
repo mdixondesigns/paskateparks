@@ -1,4 +1,4 @@
-import { PhotoStrip } from "./PhotoStrip";
+import { PhotoGallery } from "./PhotoGallery";
 import type { ParkWithRelations } from "@/lib/park-query";
 
 interface Props {
@@ -39,7 +39,7 @@ export function Overview({ park }: Props) {
       ) : null}
       {hasPhotos ? (
         <div className="mt-3">
-          <PhotoStrip parkName={park.name} photos={park.photos} />
+          <PhotoGallery parkName={park.name} photos={park.photos} />
         </div>
       ) : null}
     </section>
