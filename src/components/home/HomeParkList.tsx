@@ -40,7 +40,8 @@ function matchesFilter(park: HomeParkRow, q: string): boolean {
   if (!needle) return true;
   return (
     park.name.toLowerCase().includes(needle) ||
-    park.city.toLowerCase().includes(needle)
+    park.city.toLowerCase().includes(needle) ||
+    (park.alias?.toLowerCase().includes(needle) ?? false)
   );
 }
 
