@@ -1,15 +1,11 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { Breadcrumb } from "@/components/site/Breadcrumb";
 import { JsonLd } from "@/components/seo/JsonLd";
 import { NearbyCard, type NearbyCardItem } from "@/components/park/NearbyCard";
 import { COUNTIES, assertCountiesInData, countyForSlug } from "@/lib/counties";
-import {
-  HOME_BREADCRUMB,
-  breadcrumbJsonLd,
-  itemListJsonLd,
-} from "@/lib/json-ld";
+import { HOME_BREADCRUMB, itemListJsonLd } from "@/lib/json-ld";
 import {
   getCountiesWithOpenParks,
   getParksByCounty,
@@ -89,10 +85,10 @@ export default async function CountyArchivePage({ params }: PageProps) {
     `Skateparks in ${county.displayName} County, Pennsylvania`,
     parks.map((p) => ({ name: p.name, url: `/park/${p.slug}` })),
   );
-  const breadcrumb = breadcrumbJsonLd([
+  const breadcrumbTrail = [
     HOME_BREADCRUMB,
     { name: `${county.displayName} County`, url: `/county/${county.slug}` },
-  ]);
+  ];
 
   const items: NearbyCardItem[] = parks.map((p) => ({
     name: p.name,
@@ -108,15 +104,7 @@ export default async function CountyArchivePage({ params }: PageProps) {
   return (
     <main id="main" className="mx-auto max-w-2xl px-4 py-6">
       <JsonLd data={itemList} />
-      <JsonLd data={breadcrumb} />
-
-      <nav aria-label="Breadcrumb" className="text-sm">
-        <Link href="/" className="underline">
-          Pennsylvania Skateparks
-        </Link>
-        <span aria-hidden="true"> / </span>
-        <span aria-current="page">{county.displayName} County</span>
-      </nav>
+      <Breadcrumb trail={breadcrumbTrail} />
 
       <h1 className="mt-4 text-2xl font-bold">
         Skateparks in {county.displayName} County, PA

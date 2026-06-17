@@ -2,8 +2,11 @@ import { notFound } from "next/navigation";
 
 import { ParkProfile } from "@/components/park/ParkProfile";
 import type { NearbyCardItem } from "@/components/park/NearbyCard";
+import { Breadcrumb } from "@/components/site/Breadcrumb";
 import { db } from "@/db/client";
 import { parks } from "@/db/schema";
+import { slugForCounty } from "@/lib/counties";
+import { HOME_BREADCRUMB, type BreadcrumbEntry } from "@/lib/json-ld";
 import {
   getAllParksForNearby,
   getAllShopsForNearby,
@@ -73,8 +76,25 @@ export default async function ParkPage({ params }: PageProps) {
     }));
   }
 
+  // Canonical hierarchy for JSON-LD (always 3 levels when county exists, else
+  // 2). Visible trail drops the park name via hideCurrent — the H1 inside
+  // ParkProfile already names the park, so the breadcrumb just shows where
+  // the user came from.
+  const countySlug = park.county ? slugForCounty(park.county) : undefined;
+  const breadcrumbTrail: BreadcrumbEntry[] = [HOME_BREADCRUMB];
+  if (park.county && countySlug) {
+    breadcrumbTrail.push({
+      name: `${park.county} County`,
+      url: `/county/${countySlug}`,
+    });
+  }
+  breadcrumbTrail.push({ name: park.name, url: `/park/${park.slug}` });
+
   return (
     <main id="main" className="mx-auto max-w-2xl">
+      <div className="px-4 pt-6">
+        <Breadcrumb trail={breadcrumbTrail} hideCurrent />
+      </div>
       <ParkProfile park={park} nearbyParks={nearbyParkItems} nearbyShops={nearbyShopItems} />
     </main>
   );
