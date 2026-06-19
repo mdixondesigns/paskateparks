@@ -303,8 +303,20 @@ async function main() {
       FROM parks
     `;
     const bySlug = new Map(existing.map((r) => [r.slug, r] as const));
-    const matchKey = (name: string, city: string) =>
-      `${name.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim()}|${city.toLowerCase().trim()}`;
+    // Loose match — strip leading "the", parenthetical alt names, and
+    // common suffixes so "The Roxborough Courts" matches "Roxborough Courts"
+    // and "Clearfield (Greentop) Skatepark" matches "Clearfield Skatepark".
+    const matchKey = (name: string, city: string) => {
+      const n = name
+        .toLowerCase()
+        .replace(/\([^)]*\)/g, " ")
+        .replace(/^the\s+/i, "")
+        .replace(/[^a-z0-9]+/g, " ")
+        .replace(/\b(skatepark|skate\s*park|skate|park|memorial|community|borough|township|crescent)\b/g, "")
+        .replace(/\s+/g, " ")
+        .trim();
+      return `${n}|${city.toLowerCase().trim()}`;
+    };
     const byNameCity = new Map(existing.map((r) => [matchKey(r.name, r.city), r] as const));
 
     interface UpdatePlan {
@@ -399,15 +411,22 @@ async function main() {
       if (toInsert.length > 5) console.log(`  …and ${toInsert.length - 5} more`);
     }
 
-    // Of the leftover DB rows, the most useful to surface are the ones whose
-    // CITY matches a row we're about to INSERT — those are very likely the
-    // pre-rename ghost from a previous import. The other leftovers are the
-    // original WP-migrated parks the CSV doesn't touch; surfacing them as
-    // "review" noise distracts from the actionable list.
-    const insertCities = new Set(toInsert.map((r) => r.city.toLowerCase()));
-    const renameCandidates = leftovers.filter((l) => insertCities.has(l.city.toLowerCase()));
+    // Rename heuristic — only flag when there is EXACTLY one leftover in a
+    // city AND exactly one INSERT in that city. Anything looser (any leftover
+    // sharing a city with any INSERT) falsely flags every park in big cities
+    // like Philadelphia as a "rename" of the one new insert there.
+    const leftoverCityCount = new Map<string, number>();
+    const insertCityCount = new Map<string, number>();
+    for (const l of leftovers) leftoverCityCount.set(l.city.toLowerCase(), (leftoverCityCount.get(l.city.toLowerCase()) ?? 0) + 1);
+    for (const r of toInsert) insertCityCount.set(r.city.toLowerCase(), (insertCityCount.get(r.city.toLowerCase()) ?? 0) + 1);
+
+    const renameCandidates = leftovers.filter((l) => {
+      const c = l.city.toLowerCase();
+      return leftoverCityCount.get(c) === 1 && insertCityCount.get(c) === 1;
+    });
+
     if (renameCandidates.length > 0) {
-      console.log(`\nLIKELY RENAMES — DB stubs whose city matches a new INSERT row:`);
+      console.log(`\nLIKELY RENAMES — DB stub is the only one in its city, and exactly one new INSERT shares that city:`);
       for (const old of renameCandidates) {
         const replacement = toInsert.find((r) => r.city.toLowerCase() === old.city.toLowerCase());
         console.log(`  ${old.slug.padEnd(40)} "${old.name}"  →  likely replaced by  "${replacement?.name}" (slug "${replacement?.slug}")`);
