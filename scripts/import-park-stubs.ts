@@ -311,6 +311,10 @@ async function main() {
         .toLowerCase()
         .replace(/\([^)]*\)/g, " ")
         .replace(/^the\s+/i, "")
+        // Expand "St." (with period) to "street" so "Wharton St. Warehouse"
+        // matches "Wharton Street Warehouse". Bare "St" stays as-is — could
+        // be Saint or Street, and the period disambiguates.
+        .replace(/\bst\./g, "street")
         .replace(/[^a-z0-9]+/g, " ")
         .replace(/\b(skatepark|skate\s*park|skate|park|memorial|community|borough|township|crescent)\b/g, "")
         .replace(/\s+/g, " ")
