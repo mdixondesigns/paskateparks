@@ -158,23 +158,11 @@ export interface MapParkRow {
  * typo (lat=999) would otherwise poison L.marker + fitBounds on /map/ and
  * break the entire map for everyone.
  */
-/** Coords-narrowed row before heroPhotoPath is merged in. */
-type CoordsNarrowedRow = Omit<MapParkRow, "heroPhotoPath">;
-
-export function hasCoords(p: {
-  id: number;
-  slug: string;
-  name: string;
-  city: string;
-  state: string;
-  lat: number | null;
-  lng: number | null;
-}): p is CoordsNarrowedRow {
-  if (p.lat === null || p.lng === null) return false;
-  if (!Number.isFinite(p.lat) || !Number.isFinite(p.lng)) return false;
-  if (p.lat < -90 || p.lat > 90 || p.lng < -180 || p.lng > 180) return false;
-  return true;
-}
+// hasCoords lives in src/lib/has-coords.ts so client components can import
+// without pulling server-only park-query into the browser bundle. Re-exported
+// from here for the existing call sites + test file.
+import { hasCoords } from "./has-coords";
+export { hasCoords };
 
 export async function getOpenParksForMap(): Promise<MapParkRow[]> {
   const rows = await getAllParksForNearby();
@@ -192,7 +180,13 @@ export async function getOpenParksForMap(): Promise<MapParkRow[]> {
   const heroByParkId = new Map(heroRows.map((r) => [r.parkId, r.storagePath]));
 
   return withCoords.map((p) => ({
-    ...p,
+    id: p.id,
+    slug: p.slug,
+    name: p.name,
+    city: p.city,
+    state: p.state,
+    lat: p.lat,
+    lng: p.lng,
     heroPhotoPath: heroByParkId.get(p.id) ?? null,
   }));
 }
