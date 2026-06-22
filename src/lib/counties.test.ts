@@ -8,8 +8,8 @@ import {
 } from "./counties";
 
 describe("COUNTIES", () => {
-  it("contains 14 entries (matches phase 5 distinct parks.county data)", () => {
-    expect(COUNTIES).toHaveLength(14);
+  it("contains 50 entries (14 phase-5 counties + 36 stub-importer counties)", () => {
+    expect(COUNTIES).toHaveLength(50);
   });
 
   it("every slug is unique", () => {
@@ -61,7 +61,7 @@ describe("slugForCounty", () => {
   });
 
   it("returns undefined for unknown display name", () => {
-    expect(slugForCounty("Lebanon")).toBeUndefined();
+    expect(slugForCounty("Nonexistent")).toBeUndefined();
     expect(slugForCounty("")).toBeUndefined();
   });
 });
@@ -86,35 +86,35 @@ describe("assertCountiesInData (build-time sanity check)", () => {
   });
 
   it("throws when any value is not in the map", () => {
-    expect(() => assertCountiesInData(["Bucks", "Lebanon"])).toThrow(
-      /Lebanon/,
+    expect(() => assertCountiesInData(["Bucks", "Nonexistent"])).toThrow(
+      /Nonexistent/,
     );
   });
 
   it("reports the count of distinct unknowns", () => {
     expect(() =>
-      assertCountiesInData(["Bucks", "Lebanon", "Lebanon", "Schuylkill"]),
+      assertCountiesInData(["Bucks", "Nonexistent", "Nonexistent", "Bogus"]),
     ).toThrow(/2 parks\.county value/);
   });
 
   it("includes every distinct unknown value in the error", () => {
     let caught: unknown;
     try {
-      assertCountiesInData(["Bucks", "Lebanon", "Schuylkill", "Erie"]);
+      assertCountiesInData(["Bucks", "Nonexistent", "Bogus", "Madeup"]);
     } catch (e) {
       caught = e;
     }
     expect(caught).toBeInstanceOf(Error);
     const msg = (caught as Error).message;
-    expect(msg).toContain("Erie");
-    expect(msg).toContain("Lebanon");
-    expect(msg).toContain("Schuylkill");
+    expect(msg).toContain("Madeup");
+    expect(msg).toContain("Nonexistent");
+    expect(msg).toContain("Bogus");
   });
 
   it("does NOT report a county twice when it appears multiple times", () => {
     let msg = "";
     try {
-      assertCountiesInData(["Lebanon", "Lebanon", "Lebanon"]);
+      assertCountiesInData(["Nonexistent", "Nonexistent", "Nonexistent"]);
     } catch (e) {
       msg = (e as Error).message;
     }

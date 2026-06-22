@@ -142,6 +142,9 @@ export interface MapParkRow {
   state: string;
   lat: number;
   lng: number;
+  /** Hero photo (sort_order=0) for thumbnail markers + popups. null = stub
+   *  park with no photos → MapView renders a plain pin instead. */
+  heroPhotoPath: string | null;
 }
 
 /**
@@ -155,6 +158,9 @@ export interface MapParkRow {
  * typo (lat=999) would otherwise poison L.marker + fitBounds on /map/ and
  * break the entire map for everyone.
  */
+/** Coords-narrowed row before heroPhotoPath is merged in. */
+type CoordsNarrowedRow = Omit<MapParkRow, "heroPhotoPath">;
+
 export function hasCoords(p: {
   id: number;
   slug: string;
@@ -163,7 +169,7 @@ export function hasCoords(p: {
   state: string;
   lat: number | null;
   lng: number | null;
-}): p is MapParkRow {
+}): p is CoordsNarrowedRow {
   if (p.lat === null || p.lng === null) return false;
   if (!Number.isFinite(p.lat) || !Number.isFinite(p.lng)) return false;
   if (p.lat < -90 || p.lat > 90 || p.lng < -180 || p.lng > 180) return false;
@@ -172,7 +178,23 @@ export function hasCoords(p: {
 
 export async function getOpenParksForMap(): Promise<MapParkRow[]> {
   const rows = await getAllParksForNearby();
-  return rows.filter(hasCoords);
+  const withCoords = rows.filter(hasCoords);
+  if (withCoords.length === 0) return [];
+
+  // Batched hero-photo lookup: one query for the sort_order=0 row of every
+  // park on the map. Merged in JS to keep getAllParksForNearby lean for its
+  // other consumer (per-park Nearby Parks sidebar, which doesn't need photos).
+  const ids = withCoords.map((p) => p.id);
+  const heroRows = await db
+    .select({ parkId: parkPhotos.parkId, storagePath: parkPhotos.storagePath })
+    .from(parkPhotos)
+    .where(and(eq(parkPhotos.sortOrder, 0), inArray(parkPhotos.parkId, ids)));
+  const heroByParkId = new Map(heroRows.map((r) => [r.parkId, r.storagePath]));
+
+  return withCoords.map((p) => ({
+    ...p,
+    heroPhotoPath: heroByParkId.get(p.id) ?? null,
+  }));
 }
 
 /** All shops with non-null coords — feed for Nearby Shops at build time. */

@@ -3,7 +3,13 @@ import { describe, expect, it } from "vitest";
 import { buildPopupNode } from "./MapPopupContent";
 
 describe("buildPopupNode — pure DOM builder (phase 7 plan-eng-review 2A)", () => {
-  const FDR = { slug: "fdr", name: "FDR Skatepark", city: "Philadelphia", state: "PA" };
+  const FDR = {
+    slug: "fdr",
+    name: "FDR Skatepark",
+    city: "Philadelphia",
+    state: "PA",
+    heroPhotoPath: null,
+  };
 
   it("returns a DIV element with the documented class", () => {
     const node = buildPopupNode(FDR);
@@ -11,12 +17,22 @@ describe("buildPopupNode — pure DOM builder (phase 7 plan-eng-review 2A)", () 
     expect(node.className).toBe("map-popup");
   });
 
-  it("renders three children in order: title (p), location (p), link (a)", () => {
+  it("renders three children in order when no photo: title (p), location (p), link (a)", () => {
     const node = buildPopupNode(FDR);
     expect(node.children).toHaveLength(3);
     expect(node.children[0]?.tagName).toBe("P");
     expect(node.children[1]?.tagName).toBe("P");
     expect(node.children[2]?.tagName).toBe("A");
+  });
+
+  it("prepends a thumbnail <img> when heroPhotoPath is set", () => {
+    const node = buildPopupNode({ ...FDR, heroPhotoPath: "parks/fdr/photo-00" });
+    expect(node.children).toHaveLength(4);
+    const img = node.children[0] as HTMLImageElement;
+    expect(img.tagName).toBe("IMG");
+    expect(img.className).toBe("map-popup__thumb");
+    expect(img.getAttribute("src")).toContain("parks/fdr/photo-00@400w.jpg");
+    expect(img.getAttribute("alt")).toBe("");
   });
 
   it("title node uses textContent = park.name (no HTML parsing)", () => {
@@ -45,6 +61,7 @@ describe("buildPopupNode — pure DOM builder (phase 7 plan-eng-review 2A)", () 
       name: "<script>alert('xss')</script>Bad Park",
       city: "Hackerville",
       state: "PA",
+      heroPhotoPath: null,
     };
     const node = buildPopupNode(evil);
     const title = node.children[0] as HTMLElement;

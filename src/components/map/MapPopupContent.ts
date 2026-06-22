@@ -5,30 +5,41 @@
 // control the data, but bindPopup(string) parses HTML — this builder removes
 // the vector entirely.
 //
-// Rendered structure:
+// Rendered structure (heroPhotoPath present):
 //
 //   <div class="map-popup">
+//     <img class="map-popup__thumb" src="…@400w.jpg" alt="" />
 //     <p class="map-popup__title">{name}</p>
 //     <p class="map-popup__loc">{city}, {state}</p>
 //     <a class="map-popup__link" href="/park/{slug}">View profile →</a>
 //   </div>
 //
-// BEM class hooks (map-popup, map-popup__title, etc.) are intentionally
-// present without CSS rules — visual design is deferred per A6. The popup
-// renders with Leaflet's default chrome plus browser-default link styling.
-// When the visual pass lands, the styling targets these hooks without
-// touching this builder.
+// When heroPhotoPath is null (stub park, no photos yet) the <img> is skipped.
+
+import { buildPhotoUrl } from "@/components/park/ResponsiveImage";
 
 export interface PopupPark {
   slug: string;
   name: string;
   city: string;
   state: string;
+  heroPhotoPath: string | null;
 }
 
 export function buildPopupNode(park: PopupPark): HTMLDivElement {
   const root = document.createElement("div");
   root.className = "map-popup";
+
+  if (park.heroPhotoPath) {
+    const img = document.createElement("img");
+    img.className = "map-popup__thumb";
+    img.setAttribute("src", buildPhotoUrl(park.heroPhotoPath, 400));
+    // Decorative in popup context — the title below names the park.
+    img.setAttribute("alt", "");
+    img.setAttribute("loading", "lazy");
+    img.setAttribute("decoding", "async");
+    root.appendChild(img);
+  }
 
   const title = document.createElement("p");
   title.className = "map-popup__title";
