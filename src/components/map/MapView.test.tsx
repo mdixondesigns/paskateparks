@@ -52,6 +52,9 @@ const { mapInstance, tileLayerInstance, clusterGroupInstance, markerInstance, L 
       tileLayer: vi.fn<AnyFn>(() => tile),
       markerClusterGroup: vi.fn<AnyFn>(() => cluster),
       marker: vi.fn<AnyFn>(() => marker),
+      // divIcon mock returns a tagged sentinel so the assertion can verify
+      // a divIcon was constructed (vs. default-pin parks below).
+      divIcon: vi.fn<AnyFn>((opts: unknown) => ({ __divIcon: true, opts })),
       Icon: { Default: { mergeOptions: vi.fn<AnyFn>() } },
     },
   };
@@ -79,9 +82,10 @@ vi.mock("leaflet/dist/images/marker-shadow.png", () => ({
 import { MapView, resolveAssetUrl, type MapPark } from "./MapView";
 
 const PA_PARKS: MapPark[] = [
-  { id: 1, slug: "fdr", name: "FDR Skatepark", city: "Philadelphia", state: "PA", lat: 39.91, lng: -75.18 },
-  { id: 2, slug: "bayne", name: "Bayne Skatepark", city: "Bellevue", state: "PA", lat: 40.5, lng: -80.05 },
-  { id: 3, slug: "9th-poplar", name: "9th and Poplar", city: "Philadelphia", state: "PA", lat: 39.97, lng: -75.16 },
+  { id: 1, slug: "fdr", name: "FDR Skatepark", city: "Philadelphia", state: "PA", lat: 39.91, lng: -75.18, heroPhotoPath: "parks/fdr/photo-00" },
+  { id: 2, slug: "bayne", name: "Bayne Skatepark", city: "Bellevue", state: "PA", lat: 40.5, lng: -80.05, heroPhotoPath: "parks/bayne/photo-00" },
+  // Stub park (no photo) — exercises the plain-pin fallback path.
+  { id: 3, slug: "9th-poplar", name: "9th and Poplar", city: "Philadelphia", state: "PA", lat: 39.97, lng: -75.16, heroPhotoPath: null },
 ];
 
 beforeEach(() => {
@@ -104,6 +108,7 @@ beforeEach(() => {
   L.tileLayer.mockClear();
   L.markerClusterGroup.mockClear();
   L.marker.mockClear();
+  L.divIcon.mockClear();
   // Note: don't clear L.Icon.Default.mergeOptions — it's called once at module
   // load (the bundler-footgun fix lives at the top of MapView.tsx, not inside
   // useEffect). Clearing it here would erase the only call we want to assert.
@@ -142,6 +147,7 @@ describe("MapView — Leaflet init flow", () => {
   it("creates one markerClusterGroup and adds one marker per park (CMT-1: D12)", () => {
     render(<MapView parks={PA_PARKS} />);
     expect(L.markerClusterGroup).toHaveBeenCalledTimes(1);
+    expect(L.markerClusterGroup).toHaveBeenCalledWith({ maxClusterRadius: 40 });
     expect(L.marker).toHaveBeenCalledTimes(PA_PARKS.length);
     expect(clusterGroupInstance.addLayer).toHaveBeenCalledTimes(PA_PARKS.length);
     // Marker coords match park lat/lng order.
@@ -151,6 +157,25 @@ describe("MapView — Leaflet init flow", () => {
       [40.5, -80.05],
       [39.97, -75.16],
     ]);
+  });
+
+  it("uses divIcon thumbnail markers for parks with photos and plain pins for stubs", () => {
+    render(<MapView parks={PA_PARKS} />);
+    // PA_PARKS has 2 parks with photos + 1 stub.
+    expect(L.divIcon).toHaveBeenCalledTimes(2);
+    // Verify the marker call for the stub (3rd park) had no icon option.
+    const markerCalls = L.marker.mock.calls;
+    expect(markerCalls[0]?.[1]).toMatchObject({ icon: { __divIcon: true } });
+    expect(markerCalls[1]?.[1]).toMatchObject({ icon: { __divIcon: true } });
+    expect(markerCalls[2]?.[1]).toBeUndefined();
+    // Generated divIcon html embeds the photo URL + escaped park name.
+    const firstIconOpts = (L.divIcon.mock.calls[0]?.[0] ?? {}) as {
+      html: string;
+      iconSize: [number, number];
+    };
+    expect(firstIconOpts.html).toContain("parks/fdr/photo-00@400w.jpg");
+    expect(firstIconOpts.html).toContain('alt="FDR Skatepark"');
+    expect(firstIconOpts.iconSize).toEqual([40, 40]);
   });
 
   it("binds a popup factory (lazy form per F3) that returns an HTMLElement", () => {
@@ -186,7 +211,7 @@ describe("MapView — Leaflet init flow", () => {
 
   it("R4 fallback: degenerate single-point bbox → setView at that point + zoom 11", () => {
     const single: MapPark[] = [
-      { id: 1, slug: "x", name: "X", city: "C", state: "PA", lat: 40.5, lng: -76.0 },
+      { id: 1, slug: "x", name: "X", city: "C", state: "PA", lat: 40.5, lng: -76.0, heroPhotoPath: null },
     ];
     render(<MapView parks={single} />);
     expect(mapInstance.setView).toHaveBeenCalledWith([40.5, -76.0], 11);

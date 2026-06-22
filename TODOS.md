@@ -75,12 +75,23 @@ Captured by /plan-eng-review on 2026-05-30. Items the eng review surfaced but ex
 **Context:** Phase 6 D2 chose a single client island that gates the button on `useEffect(() => navigator.geolocation && setSupported(true), [])`. The slot reservation is independent of that gate.
 **Depends on:** Nothing.
 
+### Homepage park-list filters
+**What:** A row of toggle chips above the search input on `/` for filtering parks by structured facets: amenities (Lit, Indoor, Restrooms, Parking, Free), surface (Concrete, Wood, Asphalt), obstacles/features (Bowl, Vert, Street, Rails). Click toggles; multi-select AND-filters the list. No dropdowns, no facet counts, no clear-all button — chips toggle themselves.
+**Why:** Free-text + distance-sort exist today; the structured facets in `park_obstacles`/`park_amenities`/`park_riding_surfaces` are invisible. A parent asking "where can I take a 7-year-old after dark" (Lit + not-Vert) has no affordance.
+**Pros:** ~80 LOC. All filterable data already in the schema. Reuses the same filter-then-sort pipeline at `HomeParkList.tsx:113`.
+**Cons:** Value compounds with content fill-in — today most parks return on most queries because the 99 stubs lack amenity/obstacle rows. Filtering looks anemic until that content lands.
+**Context:** Owner needs to pick the 4-6 chips that matter most for v1 (taste call, not a code call). Probably "Lit", "Bowl", "Indoor", "Free" to start. Look at the existing distance-sort + filter test at `HomeParkList.test.tsx` for the composition pattern to extend.
+**Depends on:** Owner triage of which chips ship.
+
 ### Search Console + measurement plan
 **What:** Add to launch checklist: verify domain in Search Console, baseline rankings for primary queries ('PA skateparks', '[city] skatepark', '[county] skateparks PA'), set weekly tracking, plus GA4/Plausible analytics setup decision (per D16).
 **Why:** D6 list-first homepage is an SEO bet (per D19). Without measurement you can't tell if the bet paid off.
 **Pros:** Closes the loop on the success criterion 'rank in Google within 90 days.'
 **Cons:** ~2 hrs of setup.
 **Context:** Tied to D16 analytics decision and D19 monitoring commitment.
+
+### ~~Map: thumbnail markers + popup photo, tighter cluster tolerance~~
+**LANDED 2026-06-18** (this session). `MapView.tsx` now renders a circular thumbnail divIcon for every park with a hero photo (`park_photos.sort_order=0`) and falls back to the default Leaflet pin for stubs without photos. `buildPopupNode` prepends the same hero photo to popups. `maxClusterRadius` lowered from the default 80px → 40px — at least 2× more pins visible on page-load zoom, Philly/Pittsburgh density still collapses. `getOpenParksForMap` extended with a batched hero-photo JOIN; `MapParkRow` gains `heroPhotoPath: string \| null`. ponytail note in `MapView.tsx` flags the 400w-jpg shortcut: if bandwidth bills jump, add 80w to WIDTHS arrays + re-run migration.
 
 ### ~~Tile provider — migrate off OSM public tiles before launch~~
 **LANDED 2026-06-08** (session 5). Swapped `MapView.tsx` to CARTO Positron (`https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png`) + matching preconnect in `src/app/map/page.tsx`. Closed the OSM-policy risk AND the visual "too realistic / atlas-y" feel in one swap. No API key needed — CARTO's public basemap policy permits anonymous use up to ~75K mapviews/mo, which exceeds our P0 traffic expectation for launch. Attribution updated to credit both OSM contributors and CARTO. If we ever blow past the free tier, the same URL pattern keys via `?api_key=` (provisioned in the CARTO dashboard) — no architecture change.

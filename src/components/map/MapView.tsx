@@ -48,6 +48,7 @@ import iconRetinaUrl from "leaflet/dist/images/marker-icon-2x.png";
 import iconUrl from "leaflet/dist/images/marker-icon.png";
 import shadowUrl from "leaflet/dist/images/marker-shadow.png";
 
+import { buildPhotoUrl } from "@/components/park/ResponsiveImage";
 import { geoButtonLabels, useGeolocation } from "@/lib/use-geolocation";
 // Type-only import — server-only modules can be safely type-imported into
 // client code (TS types don't ship to the browser bundle).
@@ -82,6 +83,38 @@ const PA_DEFAULT_ZOOM = 7;
 // single-park fallback (when fitBounds would produce a NaN bbox).
 const CLOSE_ZOOM = 11;
 const FIT_BOUNDS_PADDING: L.PointTuple = [40, 40];
+// Half the Leaflet.markercluster default (80px). Doubles the pins visible at
+// page-load zoom while still collapsing Philly/Pittsburgh density (CMT-1).
+const CLUSTER_RADIUS_PX = 40;
+// Thumbnail-pin geometry. 40px circle (16px icon-anchor offset so the bottom
+// of the ring sits over the actual lat/lng, matching the default Leaflet
+// pin behavior). Popup-anchor pulls the popup up off the ring.
+const THUMB_PIN_SIZE_PX = 40;
+const THUMB_PIN_ANCHOR: L.PointTuple = [THUMB_PIN_SIZE_PX / 2, THUMB_PIN_SIZE_PX];
+const THUMB_POPUP_ANCHOR: L.PointTuple = [0, -THUMB_PIN_SIZE_PX];
+// ponytail: thumbnails render the existing 400w jpg into a 40px circle —
+// 50KB × N pins. If Vercel bandwidth bills jump, add 80w to the WIDTHS
+// arrays in ResponsiveImage.tsx + scripts/migrate-wp/photos.ts and re-run
+// the migration to backfill the smaller rendition.
+
+function buildThumbIcon(L_: typeof L, photoPath: string, parkName: string): L.DivIcon {
+  // textContent on a detached node, then innerHTML read — safest way to
+  // produce HTML-escaped strings without importing a sanitizer. Park names
+  // are owner-authored (RLS deny-all-anon) but defense-in-depth.
+  const safeName = (() => {
+    const div = document.createElement("div");
+    div.textContent = parkName;
+    return div.innerHTML;
+  })();
+  const url = buildPhotoUrl(photoPath, 400);
+  return L_.divIcon({
+    className: "map-pin-thumb",
+    html: `<img src="${url}" alt="${safeName}" loading="lazy" decoding="async" />`,
+    iconSize: [THUMB_PIN_SIZE_PX, THUMB_PIN_SIZE_PX],
+    iconAnchor: THUMB_PIN_ANCHOR,
+    popupAnchor: THUMB_POPUP_ANCHOR,
+  });
+}
 
 // P1-E locked labels via the shared factory. Idle/pending/error copy is
 // identical to the homepage NearMeButton; only the denied-state CTA suffix
@@ -138,9 +171,15 @@ export function MapView({ parks }: MapViewProps) {
     });
     tileLayer.addTo(map);
 
-    const clusters = L.markerClusterGroup();
+    const clusters = L.markerClusterGroup({ maxClusterRadius: CLUSTER_RADIUS_PX });
     for (const park of parks) {
-      const marker = L.marker([park.lat, park.lng]);
+      // Parks with a hero photo get a thumbnail-circle divIcon; stub parks
+      // (no photo yet) fall back to the default Leaflet pin.
+      const marker = park.heroPhotoPath
+        ? L.marker([park.lat, park.lng], {
+            icon: buildThumbIcon(L, park.heroPhotoPath, park.name),
+          })
+        : L.marker([park.lat, park.lng]);
       // Lazy popup: the factory runs on first open, not at marker creation.
       // For 48 pins the upfront cost is fine, but the lazy form locks in
       // the scaling pattern as the directory grows past the 200-row tripwire.

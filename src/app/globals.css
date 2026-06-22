@@ -27,3 +27,34 @@
 body[data-map-mounted="true"] .map-fallback-list {
   display: none;
 }
+
+/* Thumbnail-pin marker — circular crop of the park's hero photo with a
+   white ring so it reads against any tile color (Positron grey, water,
+   parks). Leaflet adds .leaflet-div-icon defaults (border, background) that
+   we have to override. */
+.map-pin-thumb {
+  background: transparent;
+  border: none;
+  border-radius: 50%;
+  overflow: hidden;
+  box-shadow:
+    0 0 0 2px #fff,
+    0 1px 4px rgba(0, 0, 0, 0.4);
+}
+.map-pin-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* Popup thumbnail — wider crop, square-ish at the top of the popup. */
+.map-popup__thumb {
+  display: block;
+  width: 100%;
+  max-width: 180px;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  margin-bottom: 6px;
+  border-radius: 4px;
+}
