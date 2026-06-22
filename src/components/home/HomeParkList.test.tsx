@@ -69,6 +69,16 @@ function installGeolocation(coords: { latitude: number; longitude: number } | "d
   });
 }
 
+// E4 (2026-06-22 eng review) — these existing tests ARE the regression suite
+// for the SyncedMapList wrapper refactor. Per E3, HomeParkList is NOT
+// modified; the wrapper composes a bbox-filter step above it. The 4
+// pre-refactor scenarios called out by the iron rule are covered at:
+//   - "filter input" describe (line ~97): freetext filter alone
+//   - "geo grant" describe (line ~137): distance-sort on geolocation
+//   - "CMT-2: filter + geo compose" describe (line ~199): composition
+//   - "P1-A: writes a status announcement" (line ~188): status copy
+// Future changes to HomeParkList's public props or filter pipeline must
+// keep these passing.
 describe("HomeParkList", () => {
   describe("default render (no geo, no filter)", () => {
     it("renders all parks in the order they came in (alpha from the server)", () => {
