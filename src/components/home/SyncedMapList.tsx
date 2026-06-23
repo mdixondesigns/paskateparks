@@ -39,6 +39,7 @@ import { hasCoords } from "@/lib/has-coords";
 import type { HomeParkRow, MapParkRow } from "@/lib/park-query";
 import { useMapUrlState } from "@/lib/use-map-url-state";
 
+import { HomeFooter } from "./HomeFooter";
 import { HomeParkList } from "./HomeParkList";
 
 import type { MapMoveEnd } from "@/components/map/MapView";
@@ -314,6 +315,7 @@ export function SyncedMapList({ parks }: Props) {
           mapCenter={mapCenter}
           onLocation={handleLocation}
         />
+        <HomeFooter />
       </div>
       <div
         className={
