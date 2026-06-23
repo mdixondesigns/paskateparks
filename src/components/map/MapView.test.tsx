@@ -78,13 +78,15 @@ const { mapInstance, tileLayerInstance, clusterGroupInstance, createdMarkers, L 
   const zoomToShowLayerImpl = ((_marker: unknown, cb?: () => void) => {
     cb?.();
   }) as unknown as AnyFn;
+  // Default getVisibleParent: every marker is its own visible parent (no
+  // collapsed clusters). Tests that want to simulate a clustered marker
+  // override this on the instance.
+  const getVisibleParentImpl = ((marker: unknown) => marker) as unknown as AnyFn;
   const cluster = {
     addLayer: vi.fn<AnyFn>(),
-    // T5 — Leaflet.markercluster API used by the selectedParkId effect. The
-    // mock immediately invokes the callback as if the cluster was already
-    // expanded (real Leaflet may animate cluster expansion first, but for
-    // unit tests we collapse the animation).
+    // Leaflet.markercluster APIs we depend on.
     zoomToShowLayer: vi.fn<AnyFn>(zoomToShowLayerImpl),
+    getVisibleParent: vi.fn<AnyFn>(getVisibleParentImpl),
   };
   // Tracks every marker created via L.marker — tests use this to find a
   // specific marker by park-coord and assert per-marker behavior (click
@@ -192,6 +194,11 @@ beforeEach(() => {
   });
   clusterGroupInstance.addLayer.mockClear();
   clusterGroupInstance.zoomToShowLayer.mockClear();
+  clusterGroupInstance.getVisibleParent.mockClear();
+  // Reset default: every marker is visible (no clusters).
+  clusterGroupInstance.getVisibleParent.mockImplementation(
+    ((marker: unknown) => marker) as unknown as (...args: unknown[]) => unknown,
+  );
   // createdMarkers is the source of truth for "what markers exist this test".
   // Clear it so each test starts with no leaked markers from prior renders.
   createdMarkers.length = 0;
@@ -527,14 +534,44 @@ describe("MapView — hoveredParkId opens popup without zooming", () => {
     expect(createdMarkers[1]?.openPopup).not.toHaveBeenCalled();
     rerender(<MapView parks={PA_PARKS} hoveredParkId={2} />);
     // Hover sync should NOT zoom — that would yank the map view on every
-    // hover (terrible UX). Only selectedParkId path zooms.
+    // hover (terrible UX).
     expect(clusterGroupInstance.zoomToShowLayer).not.toHaveBeenCalled();
     expect(createdMarkers[1]?.openPopup).toHaveBeenCalledOnce();
+  });
+
+  it("skips openPopup when the marker is hidden inside a collapsed cluster", () => {
+    // Simulate: marker for park id=2 (Bayne) is inside a collapsed cluster
+    // — getVisibleParent returns the cluster, not the marker itself.
+    const FAKE_CLUSTER = { __cluster: true };
+    clusterGroupInstance.getVisibleParent.mockImplementation(((marker: unknown) => {
+      const m = marker as { coord?: [number, number] };
+      if (m.coord?.[0] === 40.5) return FAKE_CLUSTER; // Bayne
+      return marker;
+    }) as unknown as (...args: unknown[]) => unknown);
+    const { rerender } = render(<MapView parks={PA_PARKS} hoveredParkId={null} />);
+    rerender(<MapView parks={PA_PARKS} hoveredParkId={2} />);
+    expect(createdMarkers[1]?.openPopup).not.toHaveBeenCalled();
+    // Park id=1 (FDR) is NOT clustered — hover should still open its popup.
+    rerender(<MapView parks={PA_PARKS} hoveredParkId={1} />);
+    expect(createdMarkers[0]?.openPopup).toHaveBeenCalledOnce();
   });
 
   it("non-existent hoveredParkId is a no-op (defensive)", () => {
     render(<MapView parks={PA_PARKS} hoveredParkId={9999} />);
     expect(clusterGroupInstance.zoomToShowLayer).not.toHaveBeenCalled();
     for (const m of createdMarkers) expect(m.openPopup).not.toHaveBeenCalled();
+  });
+});
+
+describe("MapView — popup options (autoPan disabled to prevent hover stutter)", () => {
+  it("binds popup with autoPan: false", () => {
+    render(<MapView parks={PA_PARKS} />);
+    // bindPopup signature is (factory, options) — assert the options bag.
+    for (const m of createdMarkers) {
+      const calls = m.bindPopup.mock.calls;
+      expect(calls.length).toBeGreaterThan(0);
+      const [, opts] = calls[0]!;
+      expect(opts).toEqual({ autoPan: false });
+    }
   });
 });
