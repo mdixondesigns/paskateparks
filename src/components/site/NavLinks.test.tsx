@@ -15,45 +15,34 @@ function renderAt(pathname: string | null) {
 }
 
 describe("NavLinks", () => {
-  it("renders Map → /map and About → /about", () => {
+  it("renders About → /about", () => {
     renderAt("/");
-    expect(screen.getByRole("link", { name: "Map" })).toHaveAttribute("href", "/map");
     expect(screen.getByRole("link", { name: "About" })).toHaveAttribute("href", "/about");
   });
 
-  it("on /map: Map link is aria-current=page, About is not", () => {
-    renderAt("/map");
-    expect(screen.getByRole("link", { name: "Map" })).toHaveAttribute("aria-current", "page");
-    expect(screen.getByRole("link", { name: "About" })).not.toHaveAttribute("aria-current");
+  it("does NOT render a Map link (Plan A: /map retired in favor of synced layout on /)", () => {
+    renderAt("/");
+    expect(screen.queryByRole("link", { name: "Map" })).toBeNull();
   });
 
-  it("on a nested /map/... route: Map still counts as current", () => {
-    renderAt("/map/details");
-    expect(screen.getByRole("link", { name: "Map" })).toHaveAttribute("aria-current", "page");
-  });
-
-  it("on /about: About link is aria-current=page, Map is not", () => {
+  it("on /about: About link is aria-current=page", () => {
     renderAt("/about");
     expect(screen.getByRole("link", { name: "About" })).toHaveAttribute("aria-current", "page");
-    expect(screen.getByRole("link", { name: "Map" })).not.toHaveAttribute("aria-current");
   });
 
-  it("on the homepage /: neither nav link is marked current", () => {
+  it("on the homepage /: About link is not marked current", () => {
     renderAt("/");
-    expect(screen.getByRole("link", { name: "Map" })).not.toHaveAttribute("aria-current");
     expect(screen.getByRole("link", { name: "About" })).not.toHaveAttribute("aria-current");
   });
 
-  it("on an unrelated route (/park/fdr-skatepark): neither nav link is marked current", () => {
+  it("on an unrelated route (/park/fdr-skatepark): About link is not marked current", () => {
     renderAt("/park/fdr-skatepark");
-    expect(screen.getByRole("link", { name: "Map" })).not.toHaveAttribute("aria-current");
     expect(screen.getByRole("link", { name: "About" })).not.toHaveAttribute("aria-current");
   });
 
   it("tolerates a null pathname (SSR pre-hydration)", () => {
     cleanup();
     renderAt(null);
-    expect(screen.getByRole("link", { name: "Map" })).not.toHaveAttribute("aria-current");
     expect(screen.getByRole("link", { name: "About" })).not.toHaveAttribute("aria-current");
   });
 });
