@@ -12,48 +12,124 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 // `import MapView` at the bottom of this file) can close over them.
 // vi.fn<(...args: unknown[]) => unknown>() widens the call signature so
 // .mock.calls[i][j] doesn't index into a `[]` tuple type.
-const { mapInstance, tileLayerInstance, clusterGroupInstance, markerInstance, L } = vi.hoisted(() => {
+const { mapInstance, tileLayerInstance, clusterGroupInstance, createdMarkers, L } = vi.hoisted(() => {
   type AnyFn = (...args: unknown[]) => unknown;
+  // Event handlers attached to the map via `map.on(event, cb)` — keyed by
+  // event name so tests can fire them imperatively.
+  const mapHandlers = new Map<string, Array<(...args: unknown[]) => unknown>>();
+  // Configurable view state — tests can mutate these before firing 'moveend'
+  // to simulate where the map is after a user pan/zoom.
+  const mapView = {
+    bounds: { south: 39.0, west: -80.5, north: 42.5, east: -74.7 },
+    center: { lat: 40.9, lng: -77.5 },
+    zoom: 7,
+  };
+  // Cast through `unknown` for the typed implementations — vi.fn<AnyFn>'s
+  // (...args: unknown[]) constraint doesn't unify with our specific param
+  // types, but the runtime behavior is correct.
+  const onImpl = ((event: string, cb: (...args: unknown[]) => unknown) => {
+    const list = mapHandlers.get(event) ?? [];
+    list.push(cb);
+    mapHandlers.set(event, list);
+    return map;
+  }) as unknown as AnyFn;
+  const getBoundsImpl = (() => ({
+    getSouth: () => mapView.bounds.south,
+    getWest: () => mapView.bounds.west,
+    getNorth: () => mapView.bounds.north,
+    getEast: () => mapView.bounds.east,
+  })) as unknown as AnyFn;
   const map = {
     addLayer: vi.fn<AnyFn>(),
     setView: vi.fn<AnyFn>(),
     fitBounds: vi.fn<AnyFn>(),
     flyTo: vi.fn<AnyFn>(),
     remove: vi.fn<AnyFn>(),
-    // F5: phase 7 ship-review fix — MapView relocates attribution to topright
-    // to avoid the floating Find-me button's overlap on small viewports.
+    on: vi.fn<AnyFn>(onImpl),
+    getBounds: vi.fn<AnyFn>(getBoundsImpl),
+    getCenter: vi.fn<AnyFn>(() => mapView.center),
+    getZoom: vi.fn<AnyFn>(() => mapView.zoom),
+    /** Test helper — fire all registered handlers for an event. */
+    __fire: (event: string, ...args: unknown[]) => {
+      const list = mapHandlers.get(event) ?? [];
+      for (const cb of list) cb(...args);
+    },
+    /** Test helper — reconfigure the map view returned by getBounds/center/zoom. */
+    __setView: (bounds: typeof mapView.bounds, center: typeof mapView.center, zoom: number) => {
+      mapView.bounds = bounds;
+      mapView.center = center;
+      mapView.zoom = zoom;
+    },
+    /** Test helper — clear all registered event handlers (called in beforeEach). */
+    __resetHandlers: () => mapHandlers.clear(),
     attributionControl: { setPosition: vi.fn<AnyFn>() },
   };
-  // Tile layer mock includes `once` so the A4 mount-on-tile-load handler can
-  // be installed and invoked from tests (callable to simulate tile success).
   const tile = {
     addTo: vi.fn<AnyFn>(),
     once: vi.fn<AnyFn>(),
   };
   tile.addTo.mockImplementation(() => tile);
-  // Capture the load callback so tests can drive the mount transition.
   tile.once.mockImplementation((..._args: unknown[]) => {
-    // Synchronously fire the load callback for tests that expect immediate
-    // mount. Real Leaflet fires this when the first tile batch loads.
     const cb = _args[1] as (() => void) | undefined;
     cb?.();
     return tile;
   });
-  const cluster = { addLayer: vi.fn<AnyFn>() };
-  const marker = { bindPopup: vi.fn<AnyFn>() };
-  marker.bindPopup.mockImplementation(() => marker);
+  const zoomToShowLayerImpl = ((_marker: unknown, cb?: () => void) => {
+    cb?.();
+  }) as unknown as AnyFn;
+  const cluster = {
+    addLayer: vi.fn<AnyFn>(),
+    // T5 — Leaflet.markercluster API used by the selectedParkId effect. The
+    // mock immediately invokes the callback as if the cluster was already
+    // expanded (real Leaflet may animate cluster expansion first, but for
+    // unit tests we collapse the animation).
+    zoomToShowLayer: vi.fn<AnyFn>(zoomToShowLayerImpl),
+  };
+  // Tracks every marker created via L.marker — tests use this to find a
+  // specific marker by park-coord and assert per-marker behavior (click
+  // handlers, openPopup, etc.).
+  const createdMarkers: Array<{
+    coord: [number, number];
+    handlers: Map<string, Array<(...args: unknown[]) => unknown>>;
+    bindPopup: ReturnType<typeof vi.fn>;
+    on: ReturnType<typeof vi.fn>;
+    openPopup: ReturnType<typeof vi.fn>;
+    __fire: (event: string, ...args: unknown[]) => void;
+  }> = [];
   return {
     mapInstance: map,
     tileLayerInstance: tile,
     clusterGroupInstance: cluster,
-    markerInstance: marker,
+    createdMarkers,
     L: {
       map: vi.fn<AnyFn>(() => map),
       tileLayer: vi.fn<AnyFn>(() => tile),
       markerClusterGroup: vi.fn<AnyFn>(() => cluster),
-      marker: vi.fn<AnyFn>(() => marker),
-      // divIcon mock returns a tagged sentinel so the assertion can verify
-      // a divIcon was constructed (vs. default-pin parks below).
+      marker: vi.fn<AnyFn>(((coord: [number, number]) => {
+        const handlers = new Map<string, Array<(...args: unknown[]) => unknown>>();
+        // Build the mock skeleton first so the on/bindPopup impls can
+        // reference `m` (which returns `m` for chainable Leaflet API).
+        const m = {
+          coord,
+          handlers,
+          bindPopup: vi.fn<AnyFn>(),
+          on: vi.fn<AnyFn>(),
+          openPopup: vi.fn<AnyFn>(),
+          __fire: (event: string, ...args: unknown[]) => {
+            const list = handlers.get(event) ?? [];
+            for (const cb of list) cb(...args);
+          },
+        };
+        m.bindPopup.mockImplementation((() => m) as unknown as AnyFn);
+        m.on.mockImplementation(((event: string, cb: (...args: unknown[]) => unknown) => {
+          const list = handlers.get(event) ?? [];
+          list.push(cb);
+          handlers.set(event, list);
+          return m;
+        }) as unknown as AnyFn);
+        createdMarkers.push(m);
+        return m;
+      }) as unknown as AnyFn),
       divIcon: vi.fn<AnyFn>((opts: unknown) => ({ __divIcon: true, opts })),
       Icon: { Default: { mergeOptions: vi.fn<AnyFn>() } },
     },
@@ -95,6 +171,11 @@ beforeEach(() => {
   mapInstance.fitBounds.mockClear();
   mapInstance.flyTo.mockClear();
   mapInstance.remove.mockClear();
+  mapInstance.on.mockClear();
+  mapInstance.getBounds.mockClear();
+  mapInstance.getCenter.mockClear();
+  mapInstance.getZoom.mockClear();
+  mapInstance.__resetHandlers();
   tileLayerInstance.addTo.mockClear();
   tileLayerInstance.once.mockClear();
   tileLayerInstance.once.mockImplementation((..._args: unknown[]) => {
@@ -103,7 +184,10 @@ beforeEach(() => {
     return tileLayerInstance;
   });
   clusterGroupInstance.addLayer.mockClear();
-  markerInstance.bindPopup.mockClear();
+  clusterGroupInstance.zoomToShowLayer.mockClear();
+  // createdMarkers is the source of truth for "what markers exist this test".
+  // Clear it so each test starts with no leaked markers from prior renders.
+  createdMarkers.length = 0;
   L.map.mockClear();
   L.tileLayer.mockClear();
   L.markerClusterGroup.mockClear();
@@ -180,18 +264,24 @@ describe("MapView — Leaflet init flow", () => {
 
   it("binds a popup factory (lazy form per F3) that returns an HTMLElement", () => {
     render(<MapView parks={PA_PARKS} />);
-    expect(markerInstance.bindPopup).toHaveBeenCalledTimes(PA_PARKS.length);
+    // bindPopup is called once per marker; check by summing across the
+    // per-marker mocks (T5 — markers are now distinct instances).
+    const bindPopupTotal = createdMarkers.reduce(
+      (sum, m) => sum + m.bindPopup.mock.calls.length,
+      0,
+    );
+    expect(bindPopupTotal).toBe(PA_PARKS.length);
     // F3 (ship-review): bindPopup receives a factory function, not the
     // built node directly — Leaflet calls the factory on first open. Verify
     // the factory exists and returns a real .map-popup element.
-    const popupFactory = markerInstance.bindPopup.mock.calls[0]?.[0] as () => HTMLElement;
+    const popupFactory = createdMarkers[0]?.bindPopup.mock.calls[0]?.[0] as () => HTMLElement;
     expect(typeof popupFactory).toBe("function");
     const popupNode = popupFactory();
     expect(popupNode).toBeInstanceOf(HTMLElement);
     expect(popupNode.className).toBe("map-popup");
   });
 
-  it("calls fitBounds with park bbox + padding [40,40] (1F)", () => {
+  it("calls fitBounds with park bbox + padding [40,40] + animate:false (1F, T7)", () => {
     render(<MapView parks={PA_PARKS} />);
     expect(mapInstance.fitBounds).toHaveBeenCalledTimes(1);
     const [bounds, opts] = mapInstance.fitBounds.mock.calls[0] ?? [];
@@ -199,22 +289,25 @@ describe("MapView — Leaflet init flow", () => {
       [39.91, -80.05],
       [40.5, -75.16],
     ]);
-    expect(opts).toEqual({ padding: [40, 40] });
+    // animate:false (T7) prevents Leaflet's multi-event animation default
+    // — without it, the initial fit fires several moveends and the wrapper
+    // can't distinguish them from a user pan, leaking URL writes.
+    expect(opts).toEqual({ padding: [40, 40], animate: false });
     expect(mapInstance.setView).not.toHaveBeenCalled();
   });
 
-  it("R4 fallback: parks.length === 0 → setView(PA centroid, 7)", () => {
+  it("R4 fallback: parks.length === 0 → setView(PA centroid, 7, animate:false)", () => {
     render(<MapView parks={[]} />);
-    expect(mapInstance.setView).toHaveBeenCalledWith([40.9, -77.5], 7);
+    expect(mapInstance.setView).toHaveBeenCalledWith([40.9, -77.5], 7, { animate: false });
     expect(mapInstance.fitBounds).not.toHaveBeenCalled();
   });
 
-  it("R4 fallback: degenerate single-point bbox → setView at that point + zoom 11", () => {
+  it("R4 fallback: degenerate single-point bbox → setView at that point + zoom 11 (animate:false)", () => {
     const single: MapPark[] = [
       { id: 1, slug: "x", name: "X", city: "C", state: "PA", lat: 40.5, lng: -76.0, heroPhotoPath: null },
     ];
     render(<MapView parks={single} />);
-    expect(mapInstance.setView).toHaveBeenCalledWith([40.5, -76.0], 11);
+    expect(mapInstance.setView).toHaveBeenCalledWith([40.5, -76.0], 11, { animate: false });
     expect(mapInstance.fitBounds).not.toHaveBeenCalled();
   });
 
@@ -244,6 +337,79 @@ describe("MapView — Leaflet init flow", () => {
     unmount();
     expect(document.body.dataset.mapMounted).toBeUndefined();
     expect(mapInstance.remove).toHaveBeenCalledTimes(1);
+  });
+
+  // T5 — new prop surface for the synced-layout wrapper.
+  describe("T5: synced-layout props (selectedParkId, onMoveEnd, onMarkerClick, initialView)", () => {
+    it("uses initialView (lat/lng/zoom) instead of fitBounds when provided", () => {
+      render(<MapView parks={PA_PARKS} initialView={{ lat: 40.5, lng: -77.5, zoom: 9 }} />);
+      expect(mapInstance.setView).toHaveBeenCalledWith([40.5, -77.5], 9, { animate: false });
+      expect(mapInstance.fitBounds).not.toHaveBeenCalled();
+    });
+
+    it("falls back to fitBounds when initialView is null", () => {
+      render(<MapView parks={PA_PARKS} initialView={null} />);
+      expect(mapInstance.fitBounds).toHaveBeenCalledTimes(1);
+    });
+
+    it("binds moveend on the map (wrapper decides user-vs-programmatic, not MapView)", () => {
+      render(<MapView parks={PA_PARKS} />);
+      const eventsBound = mapInstance.on.mock.calls.map((c) => c[0]);
+      expect(eventsBound).toContain("moveend");
+      // Intentionally NOT bound — Leaflet's dragstart/zoomstart fire on
+      // programmatic moves too, so they're unreliable as a user-driven
+      // signal. SyncedMapList tracks which moves it initiated itself.
+      expect(eventsBound).not.toContain("dragstart");
+      expect(eventsBound).not.toContain("zoomstart");
+    });
+
+    it("fires onMoveEnd with bounds, lat/lng, and zoom when moveend fires", () => {
+      const onMoveEnd = vi.fn();
+      render(<MapView parks={PA_PARKS} onMoveEnd={onMoveEnd} />);
+      mapInstance.__setView(
+        { south: 39.9, west: -76.0, north: 40.1, east: -75.0 },
+        { lat: 40, lng: -75.5 },
+        11,
+      );
+      mapInstance.__fire("moveend");
+      expect(onMoveEnd).toHaveBeenCalledExactlyOnceWith({
+        bounds: { south: 39.9, west: -76.0, north: 40.1, east: -75.0 },
+        lat: 40,
+        lng: -75.5,
+        zoom: 11,
+      });
+    });
+
+    it("binds click on every marker and fires onMarkerClick with the park id", () => {
+      const onMarkerClick = vi.fn();
+      render(<MapView parks={PA_PARKS} onMarkerClick={onMarkerClick} />);
+      // Each created marker should have a 'click' handler.
+      expect(createdMarkers).toHaveLength(PA_PARKS.length);
+      for (const m of createdMarkers) {
+        const eventsBound = m.on.mock.calls.map((c) => c[0]);
+        expect(eventsBound).toContain("click");
+      }
+      // Fire the click on the second marker (Bayne, id=2) — onMarkerClick(2).
+      createdMarkers[1]!.__fire("click");
+      expect(onMarkerClick).toHaveBeenCalledExactlyOnceWith(2);
+    });
+
+    it("selectedParkId effect calls cluster.zoomToShowLayer + marker.openPopup", () => {
+      const { rerender } = render(<MapView parks={PA_PARKS} selectedParkId={null} />);
+      expect(clusterGroupInstance.zoomToShowLayer).not.toHaveBeenCalled();
+      // Park id=2 = Bayne (PA_PARKS[1]).
+      rerender(<MapView parks={PA_PARKS} selectedParkId={2} />);
+      expect(clusterGroupInstance.zoomToShowLayer).toHaveBeenCalledOnce();
+      const [markerArg] = clusterGroupInstance.zoomToShowLayer.mock.calls[0]!;
+      // The mock fires the cb immediately, so openPopup should be invoked.
+      expect((markerArg as { coord: [number, number] }).coord).toEqual([40.5, -80.05]);
+      expect((markerArg as { openPopup: ReturnType<typeof vi.fn> }).openPopup).toHaveBeenCalledOnce();
+    });
+
+    it("selectedParkId set to a non-existent park id is a no-op (defensive)", () => {
+      render(<MapView parks={PA_PARKS} selectedParkId={9999} />);
+      expect(clusterGroupInstance.zoomToShowLayer).not.toHaveBeenCalled();
+    });
   });
 
   it("merges the icon URL fix into L.Icon.Default (bundler footgun)", () => {

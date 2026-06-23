@@ -65,11 +65,15 @@ function pluralize(n: number, noun: string): string {
 
 // Single shape converter so the three call sites (sorted, no-coords append,
 // alpha default) don't drift. Distance is omitted when undefined (D6 widening).
+// id is always passed so SyncedMapList can query the card by data-park-id for
+// the marker → list click sync. (Cards on /park/[slug] don't go through this
+// converter, so they correctly stay sync-inert with no data-park-id attr.)
 function toCardItem(
   p: HomeParkRow,
   extras: { distanceMiles?: number; priority?: boolean } = {},
 ): NearbyCardItem {
   return {
+    id: p.id,
     name: p.name,
     city: p.city,
     state: p.state,

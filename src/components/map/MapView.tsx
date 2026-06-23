@@ -36,6 +36,8 @@ import L from "leaflet";
 import "leaflet.markercluster";
 import { useEffect, useRef } from "react";
 
+import type { LatLngBoundsLike } from "@/lib/bbox-filter";
+
 // Bundler footgun fix: Leaflet's default icon URLs point at paths that don't
 // survive Next's build. Pin explicit URLs from the installed leaflet package.
 // Next 16 + Turbopack returns the URL as a plain string; Webpack and the
@@ -125,14 +127,58 @@ const FIND_ME_LABELS = geoButtonLabels("use the list");
 // truth so future schema additions land in one place.
 export type MapPark = MapParkRow;
 
-export interface MapViewProps {
-  parks: MapPark[];
+export interface MapMoveEnd {
+  /** Map bounds after the move settled. Plain shape — no Leaflet dependency. */
+  bounds: LatLngBoundsLike;
+  /** Center of the new view (lat, lng) and current zoom. */
+  lat: number;
+  lng: number;
+  zoom: number;
 }
 
-export function MapView({ parks }: MapViewProps) {
+export interface MapViewProps {
+  parks: MapPark[];
+  /** Optional initial view (lat/lng/zoom) — when present, used instead of the
+   *  default fit-bounds-to-all-parks. Wrapper passes this from URL state. */
+  initialView?: { lat: number; lng: number; zoom: number } | null;
+  /** When changes to a non-null park id, the map zooms to show that marker
+   *  (expanding any containing cluster) and opens its popup. T5 + T6 click
+   *  sync — set this from the wrapper's selectedParkId state. */
+  selectedParkId?: number | null;
+  /** Fires after every map move/zoom settles. Wrapper composes this with
+   *  useMapUrlState (URL write) and the bbox-filter button visibility. */
+  onMoveEnd?: (event: MapMoveEnd) => void;
+  /** Fires when the user clicks a park marker. Receives the park id. */
+  onMarkerClick?: (parkId: number) => void;
+}
+
+export function MapView({
+  parks,
+  initialView,
+  selectedParkId,
+  onMoveEnd,
+  onMarkerClick,
+}: MapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
+  const clusterGroupRef = useRef<L.MarkerClusterGroup | null>(null);
+  // park.id → marker, so the selectedParkId effect can find the right marker
+  // without iterating. Cleared in the unmount cleanup.
+  const markersByParkIdRef = useRef<Map<number, L.Marker>>(new Map());
+  // Latest-callback refs — let the init effect (empty deps) reach the LATEST
+  // callbacks without re-running. Standard pattern for "init once, callback
+  // can change between renders" in React.
+  const onMoveEndRef = useRef<MapViewProps["onMoveEnd"]>(onMoveEnd);
+  const onMarkerClickRef = useRef<MapViewProps["onMarkerClick"]>(onMarkerClick);
   const geo = useGeolocation();
+
+  // Keep callback refs current without re-running init.
+  useEffect(() => {
+    onMoveEndRef.current = onMoveEnd;
+  }, [onMoveEnd]);
+  useEffect(() => {
+    onMarkerClickRef.current = onMarkerClick;
+  }, [onMarkerClick]);
 
   // Init effect — runs once. Intentionally empty deps; capturing `parks` by
   // closure is fine because the route is force-static (see
@@ -172,6 +218,7 @@ export function MapView({ parks }: MapViewProps) {
     tileLayer.addTo(map);
 
     const clusters = L.markerClusterGroup({ maxClusterRadius: CLUSTER_RADIUS_PX });
+    clusterGroupRef.current = clusters;
     for (const park of parks) {
       // Parks with a hero photo get a thumbnail-circle divIcon; stub parks
       // (no photo yet) fall back to the default Leaflet pin.
@@ -184,14 +231,49 @@ export function MapView({ parks }: MapViewProps) {
       // For 48 pins the upfront cost is fine, but the lazy form locks in
       // the scaling pattern as the directory grows past the 200-row tripwire.
       marker.bindPopup(() => buildPopupNode(park));
+      // T5 — propagate marker clicks up to the wrapper. Latest-callback ref
+      // so the init effect doesn't re-run when the prop changes.
+      marker.on("click", () => onMarkerClickRef.current?.(park.id));
       clusters.addLayer(marker);
+      markersByParkIdRef.current.set(park.id, marker);
     }
     map.addLayer(clusters);
 
-    if (parks.length === 0) {
+    // T5/T7 — moveend feeds the wrapper bounds/center/zoom for the bbox
+    // filter + URL state. We DON'T try to detect "was this user-driven?"
+    // here — Leaflet's zoomstart/dragstart events fire on programmatic zoom
+    // too, so a flag flipped on those is unreliable. Instead the wrapper
+    // tracks which moves it initiated (initial fit, click sync, "See all")
+    // via its own flags and decides whether the moveend should write URL
+    // or show "Search this area."
+    map.on("moveend", () => {
+      if (!onMoveEndRef.current) return;
+      const bounds = map.getBounds();
+      const center = map.getCenter();
+      onMoveEndRef.current({
+        bounds: {
+          south: bounds.getSouth(),
+          west: bounds.getWest(),
+          north: bounds.getNorth(),
+          east: bounds.getEast(),
+        },
+        lat: center.lat,
+        lng: center.lng,
+        zoom: map.getZoom(),
+      });
+    });
+
+    // T5 — initial view precedence: URL-supplied view > all-parks fit-bounds >
+    // PA centroid fallback. animate:false forces a single, synchronous-ish
+    // moveend instead of the multi-event animation default — the wrapper
+    // treats the first moveend as programmatic, and additional animation
+    // moveends would otherwise leak as "user pan" and write the URL.
+    if (initialView) {
+      map.setView([initialView.lat, initialView.lng], initialView.zoom, { animate: false });
+    } else if (parks.length === 0) {
       // Empty edge case — shouldn't happen because the RSC filters to open
       // parks-with-coords, but defend anyway. 48/48 currently have coords.
-      map.setView(PA_CENTROID, PA_DEFAULT_ZOOM);
+      map.setView(PA_CENTROID, PA_DEFAULT_ZOOM, { animate: false });
     } else {
       const lats = parks.map((p) => p.lat);
       const lngs = parks.map((p) => p.lng);
@@ -201,14 +283,14 @@ export function MapView({ parks }: MapViewProps) {
       const maxLng = Math.max(...lngs);
       // R4 fallback: degenerate single-point bbox would make fitBounds NaN.
       if (minLat === maxLat && minLng === maxLng) {
-        map.setView([minLat, minLng], CLOSE_ZOOM);
+        map.setView([minLat, minLng], CLOSE_ZOOM, { animate: false });
       } else {
         map.fitBounds(
           [
             [minLat, minLng],
             [maxLat, maxLng],
           ],
-          { padding: FIT_BOUNDS_PADDING },
+          { padding: FIT_BOUNDS_PADDING, animate: false },
         );
       }
     }
@@ -219,6 +301,8 @@ export function MapView({ parks }: MapViewProps) {
     return () => {
       map.remove();
       mapRef.current = null;
+      clusterGroupRef.current = null;
+      markersByParkIdRef.current.clear();
       delete document.body.dataset.mapMounted;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- init runs once; see comment above
@@ -231,6 +315,20 @@ export function MapView({ parks }: MapViewProps) {
       duration: 1.5,
     });
   }, [geo.location]);
+
+  // T5 — selectedParkId effect. When the wrapper picks a park (list-card
+  // click, hover, URL restore), expand any containing cluster, fly to the
+  // marker, and open its popup. zoomToShowLayer is the Leaflet.markercluster
+  // API that handles "the marker might be inside a collapsed cluster" —
+  // without it, openPopup on a clustered marker no-ops because the marker
+  // isn't actually in the DOM until the cluster expands.
+  useEffect(() => {
+    if (selectedParkId == null) return;
+    const marker = markersByParkIdRef.current.get(selectedParkId);
+    const cluster = clusterGroupRef.current;
+    if (!marker || !cluster) return;
+    cluster.zoomToShowLayer(marker, () => marker.openPopup());
+  }, [selectedParkId]);
 
   return (
     <div className="relative h-screen w-full">

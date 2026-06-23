@@ -1,6 +1,15 @@
 import { ResponsiveImage } from "./ResponsiveImage";
 
 export interface NearbyCardItem {
+  /**
+   * Optional park id — opts this card into the synced-map click-sync wiring.
+   * When set, the rendered <li> gets `data-park-id={id}`; SyncedMapList's
+   * scrollToParkId effect uses `querySelector('[data-park-id="..."]')` to
+   * find and scroll/flash the card on marker click. /park/[slug] callers
+   * (Nearby Parks + Nearby Shops sidebars) leave this undefined — same
+   * component, no sync behavior.
+   */
+  id?: number;
   name: string;
   city?: string | null;
   state?: string | null;
@@ -64,7 +73,10 @@ export function NearbyCard({ item }: Props) {
   );
 
   return (
-    <li className="border-t first:border-t-0">
+    <li
+      className="border-t first:border-t-0"
+      {...(item.id !== undefined ? { "data-park-id": String(item.id) } : {})}
+    >
       {item.href ? (
         <a href={item.href} className="flex items-center gap-3 px-3 py-3">
           {inner}
