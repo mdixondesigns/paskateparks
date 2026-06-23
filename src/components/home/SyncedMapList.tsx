@@ -67,6 +67,11 @@ export function SyncedMapList({ parks }: Props) {
   const popupOpenForIdRef = useRef<number | null>(null);
   const hoveredParkIdRef = useRef<number | null>(null);
   const flashedElRef = useRef<HTMLElement | null>(null);
+  // Explicit signal: "the next popupopen was caused by a marker click on
+  // the map, so scroll the matching list card into view." Set in the
+  // onMarkerClick callback; cleared after the scroll fires. Hover/focus
+  // paths never touch this ref → hover-driven opens never scroll.
+  const scrollTargetRef = useRef<number | null>(null);
 
   // Keep refs in sync so popupopen/popupclose closures see fresh values
   // without re-binding listeners on every state change.
@@ -127,16 +132,9 @@ export function SyncedMapList({ parks }: Props) {
   );
 
   // popupOpenForId effect — toggle .card-selected on the matching list
-  // card AND scroll it into view, BUT only when the popup was opened by a
-  // marker click (not by hover/focus). For hover-driven opens the user is
-  // already looking at the card; scrolling the list under a stationary
-  // cursor would cause pointerover churn.
-  //
-  // hover-vs-click detection: by the time popupopen fires from a hover,
-  // hoveredParkIdRef has already been synced to the same id (the hover
-  // event set hoveredParkId → ref-sync committed → MapView's effect called
-  // openPopup → popupopen fires). For a marker click, hoveredParkIdRef is
-  // whatever it was previously (typically null), so the ids won't match.
+  // card. Scroll the card into view ONLY when scrollTargetRef matches the
+  // open id (set by onMarkerClick). Hover/focus paths leave the ref null
+  // → hover-driven opens never scroll.
   useEffect(() => {
     if (flashedElRef.current) {
       flashedElRef.current.classList.remove("card-selected");
@@ -149,7 +147,8 @@ export function SyncedMapList({ parks }: Props) {
     if (!el) return;
     el.classList.add("card-selected");
     flashedElRef.current = el;
-    if (hoveredParkIdRef.current !== popupOpenForId) {
+    if (scrollTargetRef.current === popupOpenForId) {
+      scrollTargetRef.current = null;
       el.scrollIntoView({ behavior: "smooth", block: "center" });
     }
   }, [popupOpenForId]);
@@ -246,6 +245,14 @@ export function SyncedMapList({ parks }: Props) {
     [beginProgrammaticMoveWindow],
   );
 
+  const handleMarkerClick = useCallback((id: number) => {
+    // Arm the scroll-into-view for the popup that's about to open. Leaflet's
+    // bindPopup auto-opens on click, so popupopen fires right after this in
+    // the same JS tick — the popupOpenForId effect picks up the armed ref
+    // and scrolls. Hover/focus paths don't set this ref, so they don't scroll.
+    scrollTargetRef.current = id;
+  }, []);
+
   const handlePopupOpen = useCallback((id: number) => {
     setPopupOpenForId(id);
   }, []);
@@ -298,6 +305,7 @@ export function SyncedMapList({ parks }: Props) {
             userLocation={userLocation}
             hoveredParkId={hoveredParkId}
             onMoveEnd={handleMoveEnd}
+            onMarkerClick={handleMarkerClick}
             onPopupOpen={handlePopupOpen}
             onPopupClose={handlePopupClose}
           />
