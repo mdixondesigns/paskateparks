@@ -26,13 +26,16 @@ test.describe("Phase 10 — synced map+list on /", () => {
     const html = await res.text();
     const ids = html.match(/data-park-id="\d+"/g) ?? [];
     expect(ids.length).toBeGreaterThan(10);
-    expect(html).toContain("Pennsylvania Skateparks");
+    // Wordmark + footer copy keep the full "Pennsylvania Skateparks" string
+    // in the rendered HTML even though the visible header reads "PA Skateparks".
+    expect(html).toContain("PA Skateparks");
   });
 
   test("desktop cold load shows both panes, map mounted", async ({ page, viewport }) => {
     test.skip(!isDesktopViewport(viewport), "desktop-only test");
     await page.goto("/");
-    await expect(page.getByRole("heading", { name: /pennsylvania skateparks/i }).first()).toBeVisible();
+    // Hero h1 was removed; SiteHeader wordmark is the brand anchor on /.
+    await expect(page.getByRole("link", { name: /^PA Skateparks$/i })).toBeVisible();
     await expect(page.locator(".leaflet-container")).toHaveCount(1);
     await expect(page.locator("[data-park-id]").first()).toBeVisible();
   });

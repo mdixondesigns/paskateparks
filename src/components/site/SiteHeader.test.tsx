@@ -13,7 +13,7 @@ vi.mock("next/navigation", () => ({
 describe("SiteHeader", () => {
   it("renders the wordmark as a link to the homepage", () => {
     render(<SiteHeader />);
-    const wordmark = screen.getByRole("link", { name: /pennsylvania skateparks/i });
+    const wordmark = screen.getByRole("link", { name: /pa skateparks/i });
     expect(wordmark).toHaveAttribute("href", "/");
   });
 

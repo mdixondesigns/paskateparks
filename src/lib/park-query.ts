@@ -96,7 +96,7 @@ export async function parkMetadata(slug: string): Promise<Metadata> {
   const park = await getParkBySlug(slug);
   if (!park) return { title: "Park not found" };
   return {
-    title: `${park.name} — Pennsylvania Skateparks`,
+    title: `${park.name} — PA Skateparks`,
     description:
       park.description?.slice(0, 160) ??
       `Skatepark in ${park.city}, ${park.state}. Park rules, amenities, photos, and directions.`,

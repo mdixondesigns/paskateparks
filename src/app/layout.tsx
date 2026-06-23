@@ -9,7 +9,7 @@ export const metadata: Metadata = {
   // Per-route titles override via `metadata` exports (homepage in src/app/page.tsx,
   // park profile in src/app/park/[slug]/page.tsx). Full SEO metadata pass
   // (OG image, JSON-LD ItemList, canonical) deferred to a later TODO.
-  title: "Pennsylvania Skateparks",
+  title: "PA Skateparks",
   description: "A directory of skateparks across Pennsylvania.",
 };
 

@@ -71,14 +71,14 @@ afterEach(() => {
 });
 
 describe("Phase 6 homepage", () => {
-  it("renders the hero copy and an h1", async () => {
+  it("does NOT render a hero h1 (removed by user request — list sits below nav)", async () => {
     render(await Home());
+    // The wordmark "PA Skateparks" lives in SiteHeader (not rendered here);
+    // the homepage itself no longer carries an h1 or tagline.
+    expect(screen.queryByRole("heading", { level: 1 })).not.toBeInTheDocument();
     expect(
-      screen.getByRole("heading", { level: 1, name: /pennsylvania skateparks/i }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(/directory of public skateparks across pennsylvania/i),
-    ).toBeInTheDocument();
+      screen.queryByText(/directory of public skateparks across pennsylvania/i),
+    ).not.toBeInTheDocument();
   });
 
   it("renders the <main id='main'> landmark (skip-link target)", async () => {

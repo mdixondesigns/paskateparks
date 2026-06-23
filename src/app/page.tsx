@@ -8,28 +8,18 @@ import { getAllParksForHomepage } from "@/lib/park-query";
 export const dynamic = "force-static";
 
 export const metadata = {
-  // Phase 6 ships with intentionally minimal copy. The /privacy stub (D11 +
-  // CMT-1) carries the real geolocation handling text. Visual + full SEO
-  // metadata pass is captured in a later TODO (skipped at user request).
-  title: "Pennsylvania Skateparks — find a park near you",
+  title: "PA Skateparks — find a park near you",
   description:
     "A directory of Pennsylvania skateparks. Find your nearest one by name, by city, or by location.",
 };
 
 export default async function Home() {
   const parks = await getAllParksForHomepage();
+  // Hero header (h1 + tagline) removed by user request — the list + map sit
+  // directly below the nav bar. Branding lives in SiteHeader; SEO h1 is
+  // covered by the per-park profile pages.
   return (
     <main id="main">
-      {/* Header stays in the RSC (static, no client state). On synced layout
-          ≥1024px the header sits above the list+map grid; on narrow viewports
-          it stacks above the list-only column. */}
-      <header className="mx-auto max-w-2xl px-4 py-8 lg:max-w-none lg:px-6">
-        <h1 className="text-3xl font-bold">Pennsylvania Skateparks</h1>
-        <p className="mt-2 text-sm">
-          A directory of public skateparks across Pennsylvania. Find a park
-          near you, read its rules, and get directions.
-        </p>
-      </header>
       <SyncedMapList parks={parks} />
     </main>
   );

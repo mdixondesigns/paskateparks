@@ -7,7 +7,7 @@
 export const dynamic = "force-static";
 
 export const metadata = {
-  title: "Privacy — Pennsylvania Skateparks",
+  title: "Privacy — PA Skateparks",
   description: "How Pennsylvania Skateparks handles location data, cookies, and analytics.",
 };
 
