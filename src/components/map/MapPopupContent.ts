@@ -26,7 +26,18 @@ export interface PopupPark {
   heroPhotoPath: string | null;
 }
 
-export function buildPopupNode(park: PopupPark): HTMLDivElement {
+// Optional click handler invoked when the popup's "View profile" <a> is
+// clicked. The handler receives the resolved href + the MouseEvent so the
+// caller can decide whether to preventDefault and route client-side. When
+// undefined, the link behaves as a plain anchor (full page navigation).
+// MapView wires this to `router.push(href)` so list-card and popup-link
+// clicks both feed the same intercepting-routes modal path (D6.2).
+export type PopupLinkClickHandler = (href: string, event: MouseEvent) => void;
+
+export function buildPopupNode(
+  park: PopupPark,
+  onLinkClick?: PopupLinkClickHandler,
+): HTMLDivElement {
   const root = document.createElement("div");
   root.className = "map-popup";
 
@@ -53,8 +64,28 @@ export function buildPopupNode(park: PopupPark): HTMLDivElement {
 
   const link = document.createElement("a");
   link.className = "map-popup__link";
-  link.setAttribute("href", `/park/${encodeURIComponent(park.slug)}`);
+  const href = `/park/${encodeURIComponent(park.slug)}`;
+  link.setAttribute("href", href);
   link.textContent = "View profile →";
+  if (onLinkClick) {
+    link.addEventListener("click", (event) => {
+      // Honor modifier-clicks (cmd/ctrl/shift/middle) — those should keep
+      // browser-native behavior (new tab, etc.) and skip the router push.
+      // Plain left-click delegates to the caller's router-aware handler.
+      if (
+        event.defaultPrevented ||
+        event.button !== 0 ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.shiftKey ||
+        event.altKey
+      ) {
+        return;
+      }
+      event.preventDefault();
+      onLinkClick(href, event);
+    });
+  }
   root.appendChild(link);
 
   return root;
