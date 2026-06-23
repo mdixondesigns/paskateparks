@@ -17,6 +17,15 @@ const config: NextConfig = {
   // de-indexes the old ones within a few weeks.
   async redirects() {
     return [
+      // Phase 10 D13 — /map retired in favor of the synced map+list layout on /.
+      // 301 so any external links (and the bare /map URLs we shipped through
+      // phase 7-9) transfer SEO equity to the homepage.
+      {
+        source: "/map",
+        destination: "/",
+        permanent: true,
+      },
+
       // Phase 5 trailing-slash strip for /park/<slug>/.
       {
         source: "/park/:slug/",

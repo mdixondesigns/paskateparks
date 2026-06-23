@@ -242,6 +242,55 @@ describe("HomeParkList", () => {
     });
   });
 
+  describe("T11: bbox-filter status folds into the single aria-live region", () => {
+    it("renders only one role=status region, even when bboxStatus is set", () => {
+      render(
+        <HomeParkList
+          parks={PARKS}
+          bboxStatus="Showing 3 of 5 parks in this area."
+        />,
+      );
+      // Multiple aria-live regions race each other in screen readers — assert
+      // exactly one exists on the page.
+      expect(screen.getAllByRole("status")).toHaveLength(1);
+    });
+
+    it("announces the wrapper-owned bbox copy through the existing live region", () => {
+      render(
+        <HomeParkList
+          parks={PARKS}
+          bboxStatus="Showing 3 of 5 parks in this area."
+        />,
+      );
+      const status = screen.getByRole("status");
+      expect(status.textContent).toMatch(/Showing 3 of 5 parks in this area/);
+    });
+
+    it("composes bboxStatus alongside the geo/filter status (both announce together)", async () => {
+      installGeolocation({ latitude: 39.9526, longitude: -75.1652 });
+      render(
+        <HomeParkList
+          parks={PARKS}
+          bboxStatus="Showing 3 of 5 parks in this area."
+        />,
+      );
+      fireEvent.click(screen.getByRole("button", { name: /find parks near me/i }));
+      await waitFor(() => {
+        const status = screen.getByRole("status");
+        expect(status.textContent).toMatch(/nearest to you/i);
+        expect(status.textContent).toMatch(/Showing 3 of 5 parks in this area/);
+      });
+    });
+
+    it("omitting bboxStatus leaves the live region behavior unchanged (regression for park-profile callers)", () => {
+      // Park-profile pages don't render HomeParkList today, but if they ever
+      // did, leaving the prop undefined must not break the existing behavior.
+      render(<HomeParkList parks={PARKS} />);
+      const status = screen.getByRole("status");
+      expect(status.textContent ?? "").toBe("");
+    });
+  });
+
   describe("zero parks (defensive)", () => {
     it("renders gracefully", () => {
       render(<HomeParkList parks={[]} />);
