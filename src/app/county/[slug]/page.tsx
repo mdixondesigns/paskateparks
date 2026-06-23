@@ -61,7 +61,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const citiesText = cities.length > 0 ? ` Includes parks in ${cities.join(", ")}.` : "";
 
   return {
-    title: `Skateparks in ${county.displayName} County, PA — Pennsylvania Skateparks`,
+    title: `Skateparks in ${county.displayName} County, PA — PA Skateparks`,
     description: `${count} open skatepark${count === 1 ? "" : "s"} in ${county.displayName} County, Pennsylvania.${citiesText}`,
     alternates: {
       canonical: `${SITE_URL}/county/${county.slug}`,

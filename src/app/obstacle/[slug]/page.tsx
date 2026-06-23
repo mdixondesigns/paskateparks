@@ -43,7 +43,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     names.length > 0 ? ` Featured: ${names.join(", ")}.` : "";
 
   return {
-    title: `${label} Spots in PA Skateparks — Pennsylvania Skateparks`,
+    title: `${label} Spots — PA Skateparks`,
     description: `${count} Pennsylvania skatepark${count === 1 ? "" : "s"} with ${label.toLowerCase()} obstacles.${namesText}`,
     alternates: {
       canonical: `${SITE_URL}/obstacle/${slug}`,

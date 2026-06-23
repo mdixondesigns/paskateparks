@@ -1,11 +1,13 @@
 import { test, expect } from "@playwright/test";
 
 test.describe("Phase 1 scaffold — smoke", () => {
-  test("homepage returns 200 with the placeholder heading", async ({ page }) => {
+  test("homepage returns 200 with the PA Skateparks wordmark in the nav", async ({ page }) => {
     const response = await page.goto("/");
     expect(response?.status()).toBe(200);
+    // Hero h1 was removed by user request; branding lives in the SiteHeader
+    // wordmark link instead.
     await expect(
-      page.getByRole("heading", { level: 1, name: /Pennsylvania Skateparks/i }),
+      page.getByRole("link", { name: /^PA Skateparks$/i }),
     ).toBeVisible();
   });
 

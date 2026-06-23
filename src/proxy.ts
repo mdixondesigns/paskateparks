@@ -85,7 +85,7 @@ const GONE_HTML = `<!doctype html>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <meta name="robots" content="noindex,nofollow" />
-  <title>Page gone — Pennsylvania Skateparks</title>
+  <title>Page gone — PA Skateparks</title>
   <style>
     html,body{margin:0;padding:0;height:100%;font-family:system-ui,-apple-system,Segoe UI,sans-serif;background:#faf6ef;color:#1a1a1a}
     main{max-width:32rem;margin:0 auto;padding:4rem 1.5rem;line-height:1.5}

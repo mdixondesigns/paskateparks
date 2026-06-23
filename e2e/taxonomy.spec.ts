@@ -55,7 +55,7 @@ test.describe("County archive — /county/[slug]", () => {
   test("metadata + canonical + JSON-LD present", async ({ page }) => {
     await page.goto("/county/bucks");
 
-    await expect(page).toHaveTitle(/Skateparks in Bucks County, PA — Pennsylvania Skateparks/);
+    await expect(page).toHaveTitle(/Skateparks in Bucks County, PA — PA Skateparks/);
 
     const canonical = page.locator("link[rel='canonical']");
     await expect(canonical).toHaveAttribute(
@@ -109,9 +109,7 @@ test.describe("Obstacle archive — /obstacle/[slug]", () => {
   test("metadata + canonical + JSON-LD present", async ({ page }) => {
     await page.goto("/obstacle/quarter-pipe");
 
-    await expect(page).toHaveTitle(
-      /Quarter Pipe Spots in PA Skateparks — Pennsylvania Skateparks/,
-    );
+    await expect(page).toHaveTitle(/Quarter Pipe Spots — PA Skateparks/);
 
     const canonical = page.locator("link[rel='canonical']");
     await expect(canonical).toHaveAttribute(

@@ -4,7 +4,7 @@
 export const dynamic = "force-static";
 
 export const metadata = {
-  title: "About — Pennsylvania Skateparks",
+  title: "About — PA Skateparks",
   description: "About the Pennsylvania Skateparks directory.",
 };
 
