@@ -103,6 +103,38 @@ Captured by /plan-eng-review on 2026-05-30. Items the eng review surfaced but ex
 
 ## P2 — nice to have, defer to post-launch
 
+### Park modal: prev/next park navigation (←/→ inside modal)
+**What:** Inside the park-detail intercept modal, support ←/→ keys (and on-screen prev/next buttons) to browse to the next/previous park without closing the modal. Navigation respects the list's current sort (nearest-by-userLocation, mapCenter, or alphabetical) so the cohort feels coherent.
+**Why:** Deferred from the park-modal CEO review (D3.2). The intercept-route pattern shipped first so we could observe demand before adding nav. Compounds with `mapCenter` sort — a parent scanning parks in the western PA cluster could ←/→ through them without re-opening the list. Matches Zillow/Airbnb pattern.
+**Pros:** Higher-velocity browsing for users with intent ("show me the next nearby"). One additional small affordance on top of the modal we just shipped.
+**Cons:** Adds state plumbing: modal needs to know the ordered cohort. Either ModalShell reads from SyncedMapList (cross-tree), or the cohort gets serialized into URL query params (uglier URL but cleaner ownership). Modal-to-modal navigation isn't free: <dialog>.showModal() makes the background inert, so swapping the modal's content via router.replace is fine, but the URL+modal+focus dance needs E2E coverage.
+**Context:** Plan-mode locked in docs/designs/park-modal.md (D3.2). The simpler implementation: ModalShell receives a `cohort: ParkRef[]` + `currentIndex` prop and renders prev/next buttons that `router.replace('/park/<next-slug>')`. The intercept route catches the replace and re-renders with the new park's data. Effort: M (~half day with E2E).
+**Depends on:** Park modal v1 (this branch).
+
+### Park modal: focus return to the triggering card on close
+**What:** When the user closes the park-detail intercept modal, focus returns to the list card / marker / popup link that opened it (rather than falling to `<body>` per native `<dialog>` close behavior). Keyboard users can then tab to the next card without leaving their place in the list.
+**Why:** Deferred from the park-modal review (D5.1). The "ideal" capture-trigger-and-restore needs either a render-context that survives navigation (a React context bridging SyncedMapList and ModalShell) or sessionStorage as a side channel. Neither is large work but both are touchier than the v1 close-to-body default.
+**Pros:** Accessibility win — keyboard users get continuity. Matches the focus-return contract `<dialog>` would offer if it weren't being unmounted by the route.
+**Cons:** Adds cross-component state coordination (or a small global). Modal-mounting is per-route, so the trigger element identity has to survive the route change — sessionStorage is the cleanest source.
+**Context:** Plan-mode locked in docs/designs/park-modal.md (D5.1). Approach: on card click, write `lastClickedParkId` to sessionStorage; on ModalShell unmount, read it and `document.querySelector('[data-park-id="X"] a')?.focus()`. Effort: S (~1 hour + a11y test).
+**Depends on:** Park modal v1.
+
+### Park modal: open/close animation (fade + slide)
+**What:** Smooth fade-in/scale-up on open, fade-out on close, instead of v1's instant appearance. Honors `prefers-reduced-motion`.
+**Why:** Deferred from the park-modal review (D5.2). v1 ships no animation because `<dialog>[open]` toggles `display:none` which short-circuits CSS transitions; a real animation needs `@starting-style` + `transition-behavior: allow-discrete`, which Safari < 17.5 silently ignores (acceptable degradation, but only after we're confident the rest of the modal is stable).
+**Pros:** Polish; the visual transition reinforces "this is layered over the homepage" rather than "the page just changed".
+**Cons:** CSS-feature-gated by Safari version. The progressive enhancement is fine (older Safari sees instant open) but needs cross-browser screenshot QA.
+**Context:** Plan-mode locked in docs/designs/park-modal.md (D5.2). Effort: S (~1 hour CSS + screenshot pass).
+**Depends on:** Park modal v1.
+
+### Park modal: compact ParkSummary view (desktop alternative to full ParkProfile)
+**What:** If the full 16-section `ParkProfile` feels cramped inside the desktop modal's max-w-2xl × 90dvh frame, build a `<ParkSummary>` variant that surfaces only the high-signal sections (hero photo, name, location, amenities, photos, NearMeButton to standalone) and drops everything else. Modal renders summary; standalone /park/<slug> still ships the full profile.
+**Why:** Plan-mode call (D6.4): ship the full ParkProfile in v1 and observe. If desktop feels cramped after some real use, this is the followup. The compact view is also a natural step toward modal-to-modal navigation since less content makes prev/next more useful.
+**Pros:** Cleaner desktop modal experience; faster modal-content LCP. Doesn't reduce SEO surface (standalone still has the full profile).
+**Cons:** Two ParkProfile shapes to maintain. Risks the "modal shows less than the page" surprise — users hitting the modal and wanting the full thing would need an explicit "Open full profile" affordance.
+**Context:** Plan-mode locked in docs/designs/park-modal.md (D6.4). Decision criterion: ship v1 with full ParkProfile, judge after one week of usage. Effort: M (~half day to extract the summary + design the affordance to expand to full).
+**Depends on:** Park modal v1 + usage signal.
+
 ### `<DirectoryShell>` reusable component for /county + /obstacle archives (D3.2)
 **What:** Extract the synced map+list layout on `/` (`SyncedMapList.tsx` wrapper composing `HomeParkList` + `MapView` with shared URL/bbox/selectedParkId state) into a `<DirectoryShell parks={...}>` component, then drop it into `/county/[slug]/page.tsx` and `/obstacle/[slug]/page.tsx`. Each archive becomes a scoped synced view (parks limited to the taxonomy).
 **Why:** D3.2 was deferred so the synced-pane pattern could prove itself on `/` first. Three duplicated layouts on the production homepage + 14 county archives + 38 obstacle archives is the moment to abstract — but only AFTER the prototype is real and the edge cases are caught.
