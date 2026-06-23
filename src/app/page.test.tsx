@@ -34,6 +34,21 @@ vi.mock("@/lib/park-query", () => ({
   ]),
 }));
 
+// SyncedMapList (T2) uses useMapUrlState, which calls useRouter +
+// useSearchParams from next/navigation. Vitest doesn't ship the App
+// Router context — stub the hooks at the module boundary.
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({
+    replace: vi.fn(),
+    push: vi.fn(),
+    back: vi.fn(),
+    forward: vi.fn(),
+    refresh: vi.fn(),
+    prefetch: vi.fn(),
+  }),
+  useSearchParams: () => new URLSearchParams(),
+}));
+
 import Home from "./page";
 
 beforeEach(() => {

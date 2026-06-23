@@ -128,4 +128,43 @@ describe("NearbyCard", () => {
     expect(img?.getAttribute("loading")).toBe("lazy");
     expect(img?.getAttribute("fetchpriority")).toBeNull();
   });
+
+  // T6 (E2) — data-park-id attribute opts the card into SyncedMapList's
+  // click-sync wiring. Park-profile callers (Nearby Parks, Nearby Shops)
+  // leave item.id undefined and stay sync-inert; the homepage's toCardItem
+  // passes it through, so cards on / get the attribute.
+  describe("T6: data-park-id click-sync opt-in", () => {
+    it("renders data-park-id on the <li> when item.id is provided", () => {
+      const { container } = render(
+        <ul>
+          <NearbyCard item={{ id: 42, name: "FDR Skatepark", href: "/park/fdr" }} />
+        </ul>,
+      );
+      const li = container.querySelector("li");
+      expect(li?.getAttribute("data-park-id")).toBe("42");
+    });
+
+    it("does NOT render data-park-id when item.id is omitted (park-profile caller)", () => {
+      const { container } = render(
+        <ul>
+          <NearbyCard item={{ name: "Nearby Park", href: "/park/nearby" }} />
+        </ul>,
+      );
+      const li = container.querySelector("li");
+      expect(li?.hasAttribute("data-park-id")).toBe(false);
+    });
+
+    it("renders data-park-id even on null-coord cards (clicking is a no-op for flyTo, but the attr stays)", () => {
+      // Codex catch — null-coord cards still need to be discoverable in the
+      // DOM so the wrapper effect can find them if they're somehow selected
+      // (e.g., URL params point to a stub park id).
+      const { container } = render(
+        <ul>
+          <NearbyCard item={{ id: 99, name: "Stub Park", href: "/park/stub" }} />
+        </ul>,
+      );
+      const li = container.querySelector("li");
+      expect(li?.getAttribute("data-park-id")).toBe("99");
+    });
+  });
 });
