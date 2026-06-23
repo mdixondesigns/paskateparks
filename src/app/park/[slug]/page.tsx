@@ -12,6 +12,7 @@ import {
   getAllShopsForNearby,
   getHeroPhotoFor,
   getParkBySlug,
+  parkMetadata,
 } from "@/lib/park-query";
 import { findNearby } from "@/lib/nearby";
 
@@ -29,14 +30,7 @@ export async function generateStaticParams() {
 
 export async function generateMetadata({ params }: PageProps) {
   const { slug } = await params;
-  const park = await getParkBySlug(slug);
-  if (!park) return { title: "Park not found" };
-  return {
-    title: `${park.name} — Pennsylvania Skateparks`,
-    description:
-      park.description?.slice(0, 160) ??
-      `Skatepark in ${park.city}, ${park.state}. Park rules, amenities, photos, and directions.`,
-  };
+  return parkMetadata(slug);
 }
 
 export default async function ParkPage({ params }: PageProps) {

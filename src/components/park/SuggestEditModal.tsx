@@ -36,10 +36,21 @@ export function SuggestEditModal({ parkId, parkName, onClose }: Props) {
     firstFieldRef.current?.focus();
   }, []);
 
-  // ESC closes the modal.
+  // ESC closes the modal. Eng-review D2 / D6.3: SuggestEditModal can be
+  // rendered inside the park-detail native <dialog> (intercept-route modal).
+  // Pressing ESC there normally triggers BOTH this handler AND the outer
+  // dialog's user-agent default action (cancel + close). The fix is
+  // `e.preventDefault()` on the keydown — that suppresses the dialog's UA
+  // action so only this inner modal closes. `stopPropagation` is
+  // belt-and-suspenders for any future listeners further up the chain.
+  // Both calls are harmless on the standalone park page (no outer dialog).
   useEffect(() => {
     function onKeydown(e: KeyboardEvent) {
-      if (e.key === "Escape" && state !== "submitting") onClose();
+      if (e.key !== "Escape") return;
+      if (state === "submitting") return;
+      e.preventDefault();
+      e.stopPropagation();
+      onClose();
     }
     document.addEventListener("keydown", onKeydown);
     return () => document.removeEventListener("keydown", onKeydown);
