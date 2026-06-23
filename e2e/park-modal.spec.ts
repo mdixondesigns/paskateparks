@@ -232,13 +232,13 @@ test.describe("park-modal — intercepting parallel route", () => {
   test("tab title reflects open park, reverts on close", async ({ page }) => {
     await page.goto("/");
     const homepageTitle = await page.title();
-    expect(homepageTitle).toMatch(/pennsylvania skateparks/i);
+    expect(homepageTitle).toMatch(/PA Skateparks/i);
     const { link } = await getFirstParkLink(page);
     await link.click();
     await page.waitForURL(/\/park\//);
     // Title is updated client-side by ModalShell (parallel-slot
     // generateMetadata doesn't reach document.title in Next.js).
-    await expect(page).toHaveTitle(/—\s*Pennsylvania Skateparks/, { timeout: 10_000 });
+    await expect(page).toHaveTitle(/—\s*PA Skateparks/, { timeout: 10_000 });
     await page.locator("dialog.park-modal").focus();
     await page.keyboard.press("Escape");
     await page.waitForURL("/");
@@ -283,6 +283,28 @@ test.describe("park-modal — intercepting parallel route", () => {
     // Original tab unchanged.
     await expect(page).toHaveURL("/");
     await expect(page.locator("dialog.park-modal")).toHaveCount(0);
+  });
+
+  test("nested ESC: Lightbox inside modal — ESC closes Lightbox only, park modal stays", async ({
+    page,
+    viewport,
+  }) => {
+    test.skip(!isDesktopViewport(viewport), "nested ESC flow stable on desktop");
+    await page.goto("/");
+    // FDR is the prototypical park with photos in this dataset.
+    const fdrLink = page.locator('[data-park-id] a[href="/park/fdr"]').first();
+    await fdrLink.click();
+    await page.waitForURL("/park/fdr");
+    const photoThumb = page.locator('[aria-label*="View photo"]').first();
+    await photoThumb.waitFor({ timeout: 5000 });
+    await photoThumb.click();
+    const lightbox = page.locator('dialog[aria-label*="photo viewer"]');
+    await expect(lightbox).toHaveAttribute("open", "");
+    await page.keyboard.press("Escape");
+    // Lightbox closes (open attr removed) but the park modal stays open.
+    await expect(lightbox).not.toHaveAttribute("open", "");
+    await expect(page.locator("dialog.park-modal")).toHaveAttribute("open", "");
+    await expect(page).toHaveURL("/park/fdr");
   });
 
   test("nested ESC: SuggestEdit inside modal — ESC closes inner only", async ({

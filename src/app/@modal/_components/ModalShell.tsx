@@ -51,7 +51,7 @@ export function ModalShell({ parkName, notFound = false, children }: Props) {
   useEffect(() => {
     if (notFound) return;
     const previousTitle = document.title;
-    document.title = `${parkName} — Pennsylvania Skateparks`;
+    document.title = `${parkName} — PA Skateparks`;
     return () => {
       document.title = previousTitle;
     };
@@ -81,9 +81,16 @@ export function ModalShell({ parkName, notFound = false, children }: Props) {
   // Native <dialog> fires `cancel` on ESC (preventable) and `close` after
   // the cancel default action. We hook close so ESC and dlg.close() both
   // funnel through our close() helper, which handles the router.back/push
-  // contract. If close() runs as a result of our own dlg.close() call (in
-  // the cleanup effect), closingRef short-circuits to avoid double-nav.
-  function onDialogClose() {
+  // contract.
+  //
+  // event.target check is load-bearing: React's synthetic event system fires
+  // onClose on the ancestor when a descendant native <dialog> closes (the
+  // photo Lightbox lives inside ParkProfile inside this modal), and without
+  // this guard, closing the Lightbox would unconditionally close the park
+  // modal too. Filtering on event.target === dialogRef.current ensures only
+  // this dialog's own close triggers navigation.
+  function onDialogClose(event: React.SyntheticEvent<HTMLDialogElement>) {
+    if (event.target !== dialogRef.current) return;
     close();
   }
 
@@ -93,7 +100,7 @@ export function ModalShell({ parkName, notFound = false, children }: Props) {
       onClose={onDialogClose}
       onClick={onDialogClick}
       aria-labelledby="park-name"
-      className="park-modal m-0 max-w-2xl rounded-lg bg-white p-0 backdrop:bg-black/50"
+      className="park-modal w-full max-w-2xl rounded-lg bg-white p-0 backdrop:bg-black/50"
     >
       {/* Inner wrapper stops backdrop clicks from bubbling to the dialog. */}
       <div className="park-modal__content" onClick={(e) => e.stopPropagation()}>

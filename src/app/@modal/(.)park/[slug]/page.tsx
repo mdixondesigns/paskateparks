@@ -1,13 +1,5 @@
 import { ParkProfile } from "@/components/park/ParkProfile";
-import type { NearbyCardItem } from "@/components/park/NearbyCard";
-import {
-  getAllParksForNearby,
-  getAllShopsForNearby,
-  getHeroPhotoFor,
-  getParkBySlug,
-  parkMetadata,
-} from "@/lib/park-query";
-import { findNearby } from "@/lib/nearby";
+import { getParkBySlug, parkMetadata } from "@/lib/park-query";
 
 import { ModalShell } from "../../_components/ModalShell";
 
@@ -15,10 +7,18 @@ import { ModalShell } from "../../_components/ModalShell";
 // client-side navigation from /. Direct hits (refresh, shared link, Googlebot)
 // hit the standalone route at src/app/park/[slug]/page.tsx instead.
 //
-// Server component: fetches the park + nearby data; passes everything to the
-// ModalShell client wrapper which owns the <dialog> lifecycle. Mirrors the
-// standalone page's data-fetch contract so ParkProfile renders identically
-// in both surfaces.
+// Server component: fetches the park and passes it to the ModalShell client
+// wrapper which owns the <dialog> lifecycle.
+//
+// Speed optimization (user feedback): the modal SKIPS the nearby parks /
+// nearby shops fetches that the standalone page computes. Those add ~3
+// extra database round-trips (`getAllParksForNearby` + `getAllShopsForNearby`
+// + `getHeroPhotoFor`) plus the in-memory `findNearby` pass, which made the
+// modal feel sluggish (1-2s in dev with the "rendering" indicator visible).
+// `NearbyParks` and `NearbyShops` both return null on an empty items array,
+// so passing `[]` cleanly hides those two sections inside the modal while
+// the standalone /park/<slug> page (direct hits, refresh, share links)
+// keeps the full 16-section experience including nearby.
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -44,45 +44,9 @@ export default async function ParkModalPage({ params }: PageProps) {
     return <ModalShell parkName="Park not found" notFound />;
   }
 
-  // Same nearby-data shape as the standalone page so ParkProfile renders the
-  // full 16 sections (D6.4 — locked: ship the full profile in the modal).
-  let nearbyParkItems: NearbyCardItem[] = [];
-  let nearbyShopItems: NearbyCardItem[] = [];
-
-  if (park.lat != null && park.lng != null) {
-    const origin = { lat: park.lat, lng: park.lng };
-    const [allParks, allShops] = await Promise.all([
-      getAllParksForNearby(park.id),
-      getAllShopsForNearby(),
-    ]);
-    const np = findNearby(origin, allParks, { limit: 3, maxMiles: 30 });
-    const ns = findNearby(origin, allShops, { limit: 3, maxMiles: 30 });
-    const heroPhotos = await getHeroPhotoFor(np.map((p) => p.id));
-    nearbyParkItems = np.map((p) => ({
-      name: p.name,
-      city: p.city,
-      state: p.state,
-      distanceMiles: p.distanceMiles,
-      href: `/park/${p.slug}`,
-      thumbStoragePath: heroPhotos.get(p.id) ?? null,
-    }));
-    nearbyShopItems = ns.map((s) => ({
-      name: s.name,
-      city: null,
-      state: s.state,
-      distanceMiles: s.distanceMiles,
-      href: s.url ?? null,
-      thumbStoragePath: null,
-    }));
-  }
-
   return (
     <ModalShell parkName={park.name}>
-      <ParkProfile
-        park={park}
-        nearbyParks={nearbyParkItems}
-        nearbyShops={nearbyShopItems}
-      />
+      <ParkProfile park={park} nearbyParks={[]} nearbyShops={[]} />
     </ModalShell>
   );
 }
