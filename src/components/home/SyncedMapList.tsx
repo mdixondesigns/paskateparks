@@ -67,11 +67,6 @@ export function SyncedMapList({ parks }: Props) {
   const popupOpenForIdRef = useRef<number | null>(null);
   const hoveredParkIdRef = useRef<number | null>(null);
   const flashedElRef = useRef<HTMLElement | null>(null);
-  // Explicit signal: "the next popupopen was caused by a marker click on
-  // the map, so scroll the matching list card into view." Set in the
-  // onMarkerClick callback; cleared after the scroll fires. Hover/focus
-  // paths never touch this ref → hover-driven opens never scroll.
-  const scrollTargetRef = useRef<number | null>(null);
 
   // Keep refs in sync so popupopen/popupclose closures see fresh values
   // without re-binding listeners on every state change.
@@ -131,10 +126,9 @@ export function SyncedMapList({ parks }: Props) {
     [parks],
   );
 
-  // popupOpenForId effect — toggle .card-selected on the matching list
-  // card. Scroll the card into view ONLY when scrollTargetRef matches the
-  // open id (set by onMarkerClick). Hover/focus paths leave the ref null
-  // → hover-driven opens never scroll.
+  // popupOpenForId effect — toggle .card-selected on the matching list card.
+  // Scroll-into-view is intentionally NOT here; it lives in handleMarkerClick
+  // so the trigger is unambiguous (marker click only, never hover/focus).
   useEffect(() => {
     if (flashedElRef.current) {
       flashedElRef.current.classList.remove("card-selected");
@@ -147,10 +141,6 @@ export function SyncedMapList({ parks }: Props) {
     if (!el) return;
     el.classList.add("card-selected");
     flashedElRef.current = el;
-    if (scrollTargetRef.current === popupOpenForId) {
-      scrollTargetRef.current = null;
-      el.scrollIntoView({ behavior: "smooth", block: "center" });
-    }
   }, [popupOpenForId]);
 
   // Cleanup on unmount — any active highlight must not leak DOM state if
@@ -246,11 +236,13 @@ export function SyncedMapList({ parks }: Props) {
   );
 
   const handleMarkerClick = useCallback((id: number) => {
-    // Arm the scroll-into-view for the popup that's about to open. Leaflet's
-    // bindPopup auto-opens on click, so popupopen fires right after this in
-    // the same JS tick — the popupOpenForId effect picks up the armed ref
-    // and scrolls. Hover/focus paths don't set this ref, so they don't scroll.
-    scrollTargetRef.current = id;
+    // Scroll directly — no state, no effect, no timing race. The marker
+    // click is the unambiguous signal that the user wants to find this
+    // park's card in the list. Hover/focus paths never call this.
+    const root = listContainerRef.current;
+    if (!root) return;
+    const el = root.querySelector<HTMLElement>(`[data-park-id="${id}"]`);
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
   }, []);
 
   const handlePopupOpen = useCallback((id: number) => {
