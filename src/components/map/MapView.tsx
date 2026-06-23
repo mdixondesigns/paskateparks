@@ -36,8 +36,6 @@ import L from "leaflet";
 import "leaflet.markercluster";
 import { useEffect, useRef } from "react";
 
-import type { LatLngBoundsLike } from "@/lib/bbox-filter";
-
 // Bundler footgun fix: Leaflet's default icon URLs point at paths that don't
 // survive Next's build. Pin explicit URLs from the installed leaflet package.
 // Next 16 + Turbopack returns the URL as a plain string; Webpack and the
@@ -51,7 +49,6 @@ import iconUrl from "leaflet/dist/images/marker-icon.png";
 import shadowUrl from "leaflet/dist/images/marker-shadow.png";
 
 import { buildPhotoUrl } from "@/components/park/ResponsiveImage";
-import { geoButtonLabels, useGeolocation } from "@/lib/use-geolocation";
 // Type-only import — server-only modules can be safely type-imported into
 // client code (TS types don't ship to the browser bundle).
 import type { MapParkRow } from "@/lib/park-query";
@@ -85,9 +82,10 @@ const PA_DEFAULT_ZOOM = 7;
 // single-park fallback (when fitBounds would produce a NaN bbox).
 const CLOSE_ZOOM = 11;
 const FIT_BOUNDS_PADDING: L.PointTuple = [40, 40];
-// Half the Leaflet.markercluster default (80px). Doubles the pins visible at
-// page-load zoom while still collapsing Philly/Pittsburgh density (CMT-1).
-const CLUSTER_RADIUS_PX = 40;
+// Tighter than the Leaflet.markercluster 80px default — ~3× more pins
+// visible at PA-wide zoom while still collapsing the dense Philly+Pittsburgh
+// pockets (CMT-1). Dropped from 40 → 30 to surface more pins per user ask.
+const CLUSTER_RADIUS_PX = 30;
 // Thumbnail-pin geometry. 40px circle (16px icon-anchor offset so the bottom
 // of the ring sits over the actual lat/lng, matching the default Leaflet
 // pin behavior). Popup-anchor pulls the popup up off the ring.
@@ -118,19 +116,13 @@ function buildThumbIcon(L_: typeof L, photoPath: string, parkName: string): L.Di
   });
 }
 
-// P1-E locked labels via the shared factory. Idle/pending/error copy is
-// identical to the homepage NearMeButton; only the denied-state CTA suffix
-// differs ("use the list" here, "use the filter" on the homepage).
-const FIND_ME_LABELS = geoButtonLabels("use the list");
-
 // MapView consumes the same row shape park-query produces — single source of
 // truth so future schema additions land in one place.
 export type MapPark = MapParkRow;
 
 export interface MapMoveEnd {
-  /** Map bounds after the move settled. Plain shape — no Leaflet dependency. */
-  bounds: LatLngBoundsLike;
-  /** Center of the new view (lat, lng) and current zoom. */
+  /** Center of the new view (lat, lng) and current zoom. The wrapper feeds
+   *  this center into HomeParkList for the mapCenter-based sort fallback. */
   lat: number;
   lng: number;
   zoom: number;
@@ -141,23 +133,38 @@ export interface MapViewProps {
   /** Optional initial view (lat/lng/zoom) — when present, used instead of the
    *  default fit-bounds-to-all-parks. Wrapper passes this from URL state. */
   initialView?: { lat: number; lng: number; zoom: number } | null;
-  /** When changes to a non-null park id, the map zooms to show that marker
-   *  (expanding any containing cluster) and opens its popup. T5 + T6 click
-   *  sync — set this from the wrapper's selectedParkId state. */
+  /** Marker-click target. When changes to a non-null park id, the map zooms
+   *  to show that marker (expanding any containing cluster) and opens its
+   *  popup. Used for the click-sync path. */
   selectedParkId?: number | null;
-  /** Fires after every map move/zoom settles. Wrapper composes this with
-   *  useMapUrlState (URL write) and the bbox-filter button visibility. */
+  /** List-card hover/focus target. Opens that marker's popup without zooming
+   *  the map (hover should never change view). null hovers nothing. */
+  hoveredParkId?: number | null;
+  /** Last-known user location — drives flyTo + a persistent blue-dot marker.
+   *  null hides the marker; non-null re-anchors it. */
+  userLocation?: { lat: number; lng: number } | null;
+  /** Fires after every map move/zoom settles. The wrapper drives mapCenter
+   *  sort + the debounced URL write from this. */
   onMoveEnd?: (event: MapMoveEnd) => void;
-  /** Fires when the user clicks a park marker. Receives the park id. */
+  /** Fires when the user clicks a park marker. */
   onMarkerClick?: (parkId: number) => void;
+  /** Fires when a marker's popup opens — wrapper uses this for the persistent
+   *  .card-selected highlight on the matching list card. */
+  onPopupOpen?: (parkId: number) => void;
+  /** Fires when a marker's popup closes — clears the highlight. */
+  onPopupClose?: (parkId: number) => void;
 }
 
 export function MapView({
   parks,
   initialView,
   selectedParkId,
+  hoveredParkId,
+  userLocation,
   onMoveEnd,
   onMarkerClick,
+  onPopupOpen,
+  onPopupClose,
 }: MapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
@@ -165,12 +172,20 @@ export function MapView({
   // park.id → marker, so the selectedParkId effect can find the right marker
   // without iterating. Cleared in the unmount cleanup.
   const markersByParkIdRef = useRef<Map<number, L.Marker>>(new Map());
+  // marker → park.id reverse lookup so popupopen/popupclose can identify
+  // which park's popup fired without threading the id through the listener
+  // closure (would need one listener per marker; this is one global pair).
+  const parkIdByMarkerRef = useRef<WeakMap<L.Marker, number>>(new WeakMap());
+  // The blue user-location dot marker — added/moved/removed when userLocation
+  // changes. Lives outside the cluster group so it never collapses into one.
+  const userMarkerRef = useRef<L.Marker | null>(null);
   // Latest-callback refs — let the init effect (empty deps) reach the LATEST
   // callbacks without re-running. Standard pattern for "init once, callback
   // can change between renders" in React.
   const onMoveEndRef = useRef<MapViewProps["onMoveEnd"]>(onMoveEnd);
   const onMarkerClickRef = useRef<MapViewProps["onMarkerClick"]>(onMarkerClick);
-  const geo = useGeolocation();
+  const onPopupOpenRef = useRef<MapViewProps["onPopupOpen"]>(onPopupOpen);
+  const onPopupCloseRef = useRef<MapViewProps["onPopupClose"]>(onPopupClose);
 
   // Keep callback refs current without re-running init.
   useEffect(() => {
@@ -179,6 +194,12 @@ export function MapView({
   useEffect(() => {
     onMarkerClickRef.current = onMarkerClick;
   }, [onMarkerClick]);
+  useEffect(() => {
+    onPopupOpenRef.current = onPopupOpen;
+  }, [onPopupOpen]);
+  useEffect(() => {
+    onPopupCloseRef.current = onPopupClose;
+  }, [onPopupClose]);
 
   // Init effect — runs once. Intentionally empty deps; capturing `parks` by
   // closure is fine because the route is force-static (see
@@ -231,32 +252,27 @@ export function MapView({
       // For 48 pins the upfront cost is fine, but the lazy form locks in
       // the scaling pattern as the directory grows past the 200-row tripwire.
       marker.bindPopup(() => buildPopupNode(park));
-      // T5 — propagate marker clicks up to the wrapper. Latest-callback ref
-      // so the init effect doesn't re-run when the prop changes.
       marker.on("click", () => onMarkerClickRef.current?.(park.id));
+      // popupopen/popupclose drive the persistent .card-selected highlight
+      // on the list. Fires for marker-click opens AND hover-driven opens —
+      // single source of truth for "is a popup currently showing?"
+      marker.on("popupopen", () => onPopupOpenRef.current?.(park.id));
+      marker.on("popupclose", () => onPopupCloseRef.current?.(park.id));
       clusters.addLayer(marker);
       markersByParkIdRef.current.set(park.id, marker);
+      parkIdByMarkerRef.current.set(marker, park.id);
     }
     map.addLayer(clusters);
 
-    // T5/T7 — moveend feeds the wrapper bounds/center/zoom for the bbox
-    // filter + URL state. We DON'T try to detect "was this user-driven?"
-    // here — Leaflet's zoomstart/dragstart events fire on programmatic zoom
-    // too, so a flag flipped on those is unreliable. Instead the wrapper
-    // tracks which moves it initiated (initial fit, click sync, "See all")
-    // via its own flags and decides whether the moveend should write URL
-    // or show "Search this area."
+    // moveend feeds the wrapper center+zoom for mapCenter-based list sort
+    // and the debounced URL write. We DON'T try to detect "was this user-
+    // driven?" here — Leaflet's zoomstart/dragstart events fire on
+    // programmatic zoom too. Instead the wrapper tracks which moves it
+    // initiated (initial fit, click sync, find-me flyTo) via its own flags.
     map.on("moveend", () => {
       if (!onMoveEndRef.current) return;
-      const bounds = map.getBounds();
       const center = map.getCenter();
       onMoveEndRef.current({
-        bounds: {
-          south: bounds.getSouth(),
-          west: bounds.getWest(),
-          north: bounds.getNorth(),
-          east: bounds.getEast(),
-        },
         lat: center.lat,
         lng: center.lng,
         zoom: map.getZoom(),
@@ -308,20 +324,48 @@ export function MapView({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- init runs once; see comment above
   }, []);
 
-  // userLocation effect — fly to user on grant. Doesn't re-init the map.
+  // userLocation effect — fly to the user and drop/move a blue dot marker.
+  // Driven entirely by the prop; the parent owns the useGeolocation hook so
+  // both the list's NearMe button and the map react to the same source.
   useEffect(() => {
-    if (!mapRef.current || !geo.location) return;
-    mapRef.current.flyTo([geo.location.lat, geo.location.lng], CLOSE_ZOOM, {
-      duration: 1.5,
-    });
-  }, [geo.location]);
+    const map = mapRef.current;
+    if (!map) return;
+    if (!userLocation) {
+      // Location was cleared (or never set). Remove any existing dot.
+      if (userMarkerRef.current) {
+        map.removeLayer(userMarkerRef.current);
+        userMarkerRef.current = null;
+      }
+      return;
+    }
+    const latlng: L.LatLngTuple = [userLocation.lat, userLocation.lng];
+    if (userMarkerRef.current) {
+      userMarkerRef.current.setLatLng(latlng);
+    } else {
+      const dot = L.divIcon({
+        className: "user-location-marker",
+        html: '<div class="user-location-dot" aria-hidden="true"></div>',
+        iconSize: [16, 16],
+        iconAnchor: [8, 8],
+      });
+      userMarkerRef.current = L.marker(latlng, {
+        icon: dot,
+        // Sit above clustered park markers so the dot never gets visually
+        // buried under a thumbnail pin at the same coordinate.
+        zIndexOffset: 1000,
+        // Pointer-events off so the dot doesn't intercept clicks meant for
+        // park markers nearby.
+        interactive: false,
+      }).addTo(map);
+    }
+    map.flyTo(latlng, CLOSE_ZOOM, { duration: 1.5 });
+  }, [userLocation]);
 
-  // T5 — selectedParkId effect. When the wrapper picks a park (list-card
-  // click, hover, URL restore), expand any containing cluster, fly to the
-  // marker, and open its popup. zoomToShowLayer is the Leaflet.markercluster
-  // API that handles "the marker might be inside a collapsed cluster" —
-  // without it, openPopup on a clustered marker no-ops because the marker
-  // isn't actually in the DOM until the cluster expands.
+  // selectedParkId effect — marker-click target. Expand any containing
+  // cluster, fly to the marker, open its popup. zoomToShowLayer is the
+  // markercluster API for "the marker might be inside a collapsed cluster"
+  // — without it, openPopup on a clustered marker no-ops because the
+  // marker isn't in the DOM until the cluster expands.
   useEffect(() => {
     if (selectedParkId == null) return;
     const marker = markersByParkIdRef.current.get(selectedParkId);
@@ -329,6 +373,17 @@ export function MapView({
     if (!marker || !cluster) return;
     cluster.zoomToShowLayer(marker, () => marker.openPopup());
   }, [selectedParkId]);
+
+  // hoveredParkId effect — list-card hover/focus target. Open the popup
+  // WITHOUT zooming the map (hover should never change viewport). If the
+  // marker is inside a collapsed cluster, openPopup no-ops — accepted
+  // tradeoff (the user can click the card to navigate, or zoom in first).
+  useEffect(() => {
+    if (hoveredParkId == null) return;
+    const marker = markersByParkIdRef.current.get(hoveredParkId);
+    if (!marker) return;
+    marker.openPopup();
+  }, [hoveredParkId]);
 
   return (
     <div className="relative h-screen w-full">
@@ -339,21 +394,6 @@ export function MapView({
         aria-label="Map of Pennsylvania skateparks"
         role="application"
       />
-      {geo.supported ? (
-        <button
-          type="button"
-          onClick={geo.request}
-          disabled={geo.disabled}
-          aria-busy={geo.status === "pending"}
-          // z-index puts the button above Leaflet's panes (which sit at
-          // z-index ≤ 700 by default). bottom/right floats it over the map.
-          // Attribution control was relocated to topright in the init effect
-          // so this button has the bottom-right zone uncontested on mobile.
-          className="absolute bottom-4 right-4 z-[1000] rounded border bg-white px-4 py-2 text-sm font-medium shadow disabled:opacity-60"
-        >
-          {FIND_ME_LABELS[geo.status]}
-        </button>
-      ) : null}
     </div>
   );
 }

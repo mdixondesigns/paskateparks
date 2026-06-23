@@ -7,18 +7,13 @@ import type { HomeParkRow } from "@/lib/park-query";
 type SuccessCb = (pos: GeolocationPosition) => void;
 type ErrorCb = (err: GeolocationPositionError) => void;
 
-// Phase 6 D1+D2+D3+D5+CMT-2 — homepage client island.
-//
-// Tests cover the state-machine cells:
-//   - default render (alpha, no geo, no filter)
-//   - filter narrows
-//   - geo grants → re-sort by distance + priority on first 3
-//   - filter + geo compose (CMT-2)
-//   - empty filter state
-//   - aria-live announces
+// Phase 10 — HomeParkList is a presentational client component driven by
+// props from SyncedMapList: parks, userLocation, mapCenter, onLocation,
+// onError. Tests cover sort precedence (userLocation > mapCenter > alpha)
+// + filter composition + the geo-error inline alert.
 
 // happy-dom doesn't implement scrollIntoView — spyOn so restoreAllMocks()
-// cleans up between tests (plain prototype assignment would leak across files).
+// cleans up between tests.
 beforeEach(() => {
   vi.spyOn(Element.prototype, "scrollIntoView").mockImplementation(() => {});
 });
@@ -29,13 +24,15 @@ afterEach(() => {
 });
 
 const PARKS: HomeParkRow[] = [
-  // alpha order: 9th, Bayne, FDR, Granahan, Pittsburgh, Wallenpaupack, Zembo
+  // alpha order: 9th, Bayne, FDR, Granahan, Wallenpaupack
   { id: 1, slug: "9th-and-poplar", name: "9th and Poplar", alias: null, city: "Philadelphia", state: "PA", lat: 39.96, lng: -75.15, heroPhotoPath: "parks/9th/photo-01" },
   { id: 2, slug: "bayne-skatepark", name: "Bayne Skatepark", alias: "Bellevue Skate Plaza", city: "Bellevue", state: "PA", lat: 40.5, lng: -80.05, heroPhotoPath: "parks/bayne/photo-01" },
   { id: 3, slug: "fdr", name: "FDR Skatepark", alias: null, city: "Philadelphia", state: "PA", lat: 39.91, lng: -75.18, heroPhotoPath: "parks/fdr/photo-01" },
   { id: 4, slug: "granahan", name: "Granahan", alias: null, city: "Philadelphia", state: "PA", lat: 39.97, lng: -75.21, heroPhotoPath: null },
   { id: 5, slug: "wallenpaupack-skatepark", name: "Wallenpaupack Skatepark", alias: null, city: "Hawley", state: "PA", lat: 41.47, lng: -75.18, heroPhotoPath: null },
 ];
+
+const PHILLY = { lat: 39.9526, lng: -75.1652 }; // City Hall
 
 function installGeolocation(coords: { latitude: number; longitude: number } | "deny") {
   const getCurrentPosition = vi.fn((success: SuccessCb, fail?: ErrorCb) => {
@@ -58,7 +55,7 @@ function installGeolocation(coords: { latitude: number; longitude: number } | "d
           speed: null,
           toJSON: () => ({}),
         } as GeolocationCoordinates,
-        timestamp: Date.now(),
+        timestamp: 1,
         toJSON: () => ({}),
       } as GeolocationPosition);
     }
@@ -69,235 +66,174 @@ function installGeolocation(coords: { latitude: number; longitude: number } | "d
   });
 }
 
-// E4 (2026-06-22 eng review) — these existing tests ARE the regression suite
-// for the SyncedMapList wrapper refactor. Per E3, HomeParkList is NOT
-// modified; the wrapper composes a bbox-filter step above it. The 4
-// pre-refactor scenarios called out by the iron rule are covered at:
-//   - "filter input" describe (line ~97): freetext filter alone
-//   - "geo grant" describe (line ~137): distance-sort on geolocation
-//   - "CMT-2: filter + geo compose" describe (line ~199): composition
-//   - "P1-A: writes a status announcement" (line ~188): status copy
-// Future changes to HomeParkList's public props or filter pipeline must
-// keep these passing.
 describe("HomeParkList", () => {
-  describe("default render (no geo, no filter)", () => {
-    it("renders all parks in the order they came in (alpha from the server)", () => {
+  describe("default render (no sort origin, no filter)", () => {
+    it("renders parks in the input order (alphabetical from RSC)", () => {
       render(<HomeParkList parks={PARKS} />);
       const items = screen.getAllByRole("listitem");
       expect(items).toHaveLength(5);
-      // Server-supplied order is preserved
       expect(items[0]?.textContent).toContain("9th and Poplar");
       expect(items[4]?.textContent).toContain("Wallenpaupack");
     });
 
-    it("does not show distance pills in default state", () => {
+    it("does not show distance pills", () => {
       render(<HomeParkList parks={PARKS} />);
       expect(screen.queryByText(/\d+\.\d+ mi$/)).not.toBeInTheDocument();
     });
 
-    it("renders the filter input + a 'Find parks near me' button", () => {
-      installGeolocation({ latitude: 0, longitude: 0 });
-      render(<HomeParkList parks={PARKS} />);
-      expect(screen.getByPlaceholderText(/filter by name or city/i)).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: /find parks near me/i })).toBeInTheDocument();
-    });
-  });
-
-  describe("filter input", () => {
-    it("narrows the list to parks whose name matches", () => {
-      render(<HomeParkList parks={PARKS} />);
-      fireEvent.change(screen.getByPlaceholderText(/filter by name or city/i), {
-        target: { value: "FDR" },
-      });
-      const items = screen.getAllByRole("listitem");
-      expect(items).toHaveLength(1);
-      expect(items[0]?.textContent).toContain("FDR Skatepark");
-    });
-
-    it("matches against city (case-insensitive)", () => {
-      render(<HomeParkList parks={PARKS} />);
-      fireEvent.change(screen.getByPlaceholderText(/filter by name or city/i), {
-        target: { value: "philadelphia" },
-      });
-      const items = screen.getAllByRole("listitem");
-      expect(items).toHaveLength(3); // 9th, FDR, Granahan
-    });
-
-    it("matches against alias so locals can find parks by nickname", () => {
-      // Bayne's alias is "Bellevue Skate Plaza" — typing "bellevue skate" should hit it.
-      render(<HomeParkList parks={PARKS} />);
-      fireEvent.change(screen.getByPlaceholderText(/filter by name or city/i), {
-        target: { value: "bellevue skate" },
-      });
-      const items = screen.getAllByRole("listitem");
-      expect(items).toHaveLength(1);
-      expect(items[0]?.textContent).toContain("Bayne Skatepark");
-    });
-
-    it("shows an empty state when the filter matches zero parks", () => {
-      render(<HomeParkList parks={PARKS} />);
-      fireEvent.change(screen.getByPlaceholderText(/filter by name or city/i), {
-        target: { value: "xyzzy" },
-      });
-      expect(screen.getByText(/no parks match/i)).toBeInTheDocument();
-      expect(screen.queryByRole("list")).not.toBeInTheDocument();
-    });
-  });
-
-  describe("geo grant", () => {
-    it("re-sorts the list by distance from the user's location", async () => {
-      // User at Philadelphia City Hall ~ (39.9526, -75.1652). Expected
-      // nearest-first ordering of the Philly cluster:
-      //   9th and Poplar  (39.96,  -75.15)   ~0.6 mi
-      //   Granahan        (39.97,  -75.21)   ~2.5 mi
-      //   FDR             (39.91,  -75.18)   ~3.0 mi
-      //   Wallenpaupack   (41.47,  -75.18)   ~105 mi
-      //   Bayne (Bellevue)(40.50,  -80.05)   ~262 mi
-      installGeolocation({ latitude: 39.9526, longitude: -75.1652 });
-      render(<HomeParkList parks={PARKS} />);
-      fireEvent.click(screen.getByRole("button", { name: /find parks near me/i }));
-      await waitFor(() => {
-        // Wait for the sort to settle.
-        expect(screen.getAllByText(/\d+\.\d+ mi/).length).toBeGreaterThan(0);
-      });
-      const items = screen.getAllByRole("listitem");
-      expect(items[0]?.textContent).toContain("9th and Poplar");
-      expect(items[1]?.textContent).toContain("Granahan");
-      expect(items[2]?.textContent).toContain("FDR Skatepark");
-    });
-
-    it("shows distance pills on each card after geo grants", async () => {
-      installGeolocation({ latitude: 39.9526, longitude: -75.1652 });
-      render(<HomeParkList parks={PARKS} />);
-      fireEvent.click(screen.getByRole("button", { name: /find parks near me/i }));
-      await waitFor(() => {
-        // Distance pill format is "0.6 mi", "262.4 mi", etc.
-        expect(screen.getAllByText(/\d+\.\d+ mi/).length).toBeGreaterThanOrEqual(5);
-      });
-    });
-
-    it('changes the heading from "All Pennsylvania skateparks" to "Nearest to you"', async () => {
-      installGeolocation({ latitude: 39.9526, longitude: -75.1652 });
-      render(<HomeParkList parks={PARKS} />);
-      expect(screen.getByRole("heading", { name: /all pennsylvania skateparks/i })).toBeInTheDocument();
-      fireEvent.click(screen.getByRole("button", { name: /find parks near me/i }));
-      await waitFor(() => {
-        expect(screen.getByRole("heading", { name: /nearest to you/i })).toBeInTheDocument();
-      });
-    });
-
-    it("P1-A: scrolls the list into view after geo grants", async () => {
-      installGeolocation({ latitude: 39.9526, longitude: -75.1652 });
-      render(<HomeParkList parks={PARKS} />);
-      fireEvent.click(screen.getByRole("button", { name: /find parks near me/i }));
-      await waitFor(() => {
-        expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
-      });
-    });
-
-    it("P1-A: writes a status announcement to the aria-live region", async () => {
-      installGeolocation({ latitude: 39.9526, longitude: -75.1652 });
-      render(<HomeParkList parks={PARKS} />);
-      fireEvent.click(screen.getByRole("button", { name: /find parks near me/i }));
-      await waitFor(() => {
-        const status = screen.getByRole("status");
-        expect(status.textContent).toMatch(/nearest to you/i);
-      });
-    });
-  });
-
-  describe("CMT-2: filter + geo compose", () => {
-    it("preserves the filter when geo grants — sort applies WITHIN the filtered set", async () => {
-      installGeolocation({ latitude: 39.9526, longitude: -75.1652 });
-      render(<HomeParkList parks={PARKS} />);
-      // Filter to Philadelphia parks first
-      fireEvent.change(screen.getByPlaceholderText(/filter by name or city/i), {
-        target: { value: "philadelphia" },
-      });
-      expect(screen.getAllByRole("listitem")).toHaveLength(3);
-      // Then grant geo — filter should still be in effect (CMT-2: sort applies
-      // WITHIN the filtered set). Nearest Philly park to City Hall: 9th and Poplar.
-      fireEvent.click(screen.getByRole("button", { name: /find parks near me/i }));
-      await waitFor(() => {
-        const items = screen.getAllByRole("listitem");
-        expect(items).toHaveLength(3);
-        expect(items[0]?.textContent).toContain("9th and Poplar");
-      });
-      // Filter input still has its value
-      expect(screen.getByPlaceholderText(/filter by name or city/i)).toHaveValue("philadelphia");
-    });
-  });
-
-  describe("geo error", () => {
-    it("on denial: shows an inline alert, list stays in default order", async () => {
-      installGeolocation("deny");
-      render(<HomeParkList parks={PARKS} />);
-      fireEvent.click(screen.getByRole("button", { name: /find parks near me/i }));
-      await waitFor(() => {
-        expect(screen.getByRole("alert")).toBeInTheDocument();
-      });
-      // Default order preserved
-      const items = screen.getAllByRole("listitem");
-      expect(items[0]?.textContent).toContain("9th and Poplar");
-    });
-  });
-
-  describe("T11: bbox-filter status folds into the single aria-live region", () => {
-    it("renders only one role=status region, even when bboxStatus is set", () => {
-      render(
-        <HomeParkList
-          parks={PARKS}
-          bboxStatus="Showing 3 of 5 parks in this area."
-        />,
-      );
-      // Multiple aria-live regions race each other in screen readers — assert
-      // exactly one exists on the page.
-      expect(screen.getAllByRole("status")).toHaveLength(1);
-    });
-
-    it("announces the wrapper-owned bbox copy through the existing live region", () => {
-      render(
-        <HomeParkList
-          parks={PARKS}
-          bboxStatus="Showing 3 of 5 parks in this area."
-        />,
-      );
-      const status = screen.getByRole("status");
-      expect(status.textContent).toMatch(/Showing 3 of 5 parks in this area/);
-    });
-
-    it("composes bboxStatus alongside the geo/filter status (both announce together)", async () => {
-      installGeolocation({ latitude: 39.9526, longitude: -75.1652 });
-      render(
-        <HomeParkList
-          parks={PARKS}
-          bboxStatus="Showing 3 of 5 parks in this area."
-        />,
-      );
-      fireEvent.click(screen.getByRole("button", { name: /find parks near me/i }));
-      await waitFor(() => {
-        const status = screen.getByRole("status");
-        expect(status.textContent).toMatch(/nearest to you/i);
-        expect(status.textContent).toMatch(/Showing 3 of 5 parks in this area/);
-      });
-    });
-
-    it("omitting bboxStatus leaves the live region behavior unchanged (regression for park-profile callers)", () => {
-      // Park-profile pages don't render HomeParkList today, but if they ever
-      // did, leaving the prop undefined must not break the existing behavior.
+    it("renders an empty role=status region", () => {
       render(<HomeParkList parks={PARKS} />);
       const status = screen.getByRole("status");
       expect(status.textContent ?? "").toBe("");
     });
   });
 
+  describe("filter input", () => {
+    it("narrows by name", () => {
+      render(<HomeParkList parks={PARKS} />);
+      fireEvent.change(screen.getByPlaceholderText(/filter by name or city/i), {
+        target: { value: "FDR" },
+      });
+      expect(screen.getAllByRole("listitem")).toHaveLength(1);
+    });
+
+    it("matches city (case-insensitive)", () => {
+      render(<HomeParkList parks={PARKS} />);
+      fireEvent.change(screen.getByPlaceholderText(/filter by name or city/i), {
+        target: { value: "philadelphia" },
+      });
+      expect(screen.getAllByRole("listitem")).toHaveLength(3);
+    });
+
+    it("matches alias (locals' nickname)", () => {
+      render(<HomeParkList parks={PARKS} />);
+      fireEvent.change(screen.getByPlaceholderText(/filter by name or city/i), {
+        target: { value: "bellevue skate" },
+      });
+      expect(screen.getAllByRole("listitem")).toHaveLength(1);
+      expect(screen.getAllByRole("listitem")[0]?.textContent).toContain("Bayne Skatepark");
+    });
+
+    it("shows empty state when zero match", () => {
+      render(<HomeParkList parks={PARKS} />);
+      fireEvent.change(screen.getByPlaceholderText(/filter by name or city/i), {
+        target: { value: "xyzzy" },
+      });
+      expect(screen.getByText(/no parks match/i)).toBeInTheDocument();
+    });
+  });
+
+  describe("userLocation sort", () => {
+    it("re-sorts the list by distance from the user", () => {
+      render(<HomeParkList parks={PARKS} userLocation={PHILLY} />);
+      const items = screen.getAllByRole("listitem");
+      expect(items[0]?.textContent).toContain("9th and Poplar"); // ~0.6mi
+      expect(items[1]?.textContent).toContain("Granahan"); // ~2.5mi
+      expect(items[2]?.textContent).toContain("FDR Skatepark"); // ~3mi
+    });
+
+    it("shows distance pills", () => {
+      render(<HomeParkList parks={PARKS} userLocation={PHILLY} />);
+      expect(screen.getAllByText(/\d+\.\d+ mi/).length).toBeGreaterThanOrEqual(5);
+    });
+
+    it("changes the heading to 'Nearest to you'", () => {
+      render(<HomeParkList parks={PARKS} userLocation={PHILLY} />);
+      expect(screen.getByRole("heading", { name: /nearest to you/i })).toBeInTheDocument();
+    });
+
+    it("scrolls the list into view on transition from null → userLocation", () => {
+      const { rerender } = render(<HomeParkList parks={PARKS} userLocation={null} />);
+      expect(Element.prototype.scrollIntoView).not.toHaveBeenCalled();
+      rerender(<HomeParkList parks={PARKS} userLocation={PHILLY} />);
+      expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
+    });
+
+    it("writes a status announcement to role=status", () => {
+      render(<HomeParkList parks={PARKS} userLocation={PHILLY} />);
+      expect(screen.getByRole("status").textContent).toMatch(/nearest to you/i);
+    });
+  });
+
+  describe("mapCenter sort (Plan A — no bbox filter, just reorder)", () => {
+    it("sorts by distance from map center when userLocation is null", () => {
+      // Map centered on Pittsburgh — Bayne (Bellevue) should come first.
+      render(
+        <HomeParkList parks={PARKS} mapCenter={{ lat: 40.45, lng: -80.0 }} />,
+      );
+      const items = screen.getAllByRole("listitem");
+      expect(items[0]?.textContent).toContain("Bayne Skatepark");
+    });
+
+    it("suppresses distance pills (pan would churn them — too noisy)", () => {
+      render(
+        <HomeParkList parks={PARKS} mapCenter={{ lat: 40.45, lng: -80.0 }} />,
+      );
+      expect(screen.queryByText(/\d+\.\d+ mi$/)).not.toBeInTheDocument();
+    });
+
+    it("does NOT change the heading (heading swap is reserved for explicit user-location grant)", () => {
+      render(
+        <HomeParkList parks={PARKS} mapCenter={{ lat: 40.45, lng: -80.0 }} />,
+      );
+      expect(
+        screen.getByRole("heading", { name: /all pennsylvania skateparks/i }),
+      ).toBeInTheDocument();
+    });
+
+    it("userLocation wins over mapCenter (user proximity is the stronger intent)", () => {
+      // Map at Pittsburgh, user at Philly — sort by Philly (user wins).
+      render(
+        <HomeParkList
+          parks={PARKS}
+          userLocation={PHILLY}
+          mapCenter={{ lat: 40.45, lng: -80.0 }}
+        />,
+      );
+      const items = screen.getAllByRole("listitem");
+      expect(items[0]?.textContent).toContain("9th and Poplar");
+    });
+  });
+
+  describe("CMT-2: filter + sort compose", () => {
+    it("filter narrows the set; userLocation sorts within it", () => {
+      const { container } = render(
+        <HomeParkList parks={PARKS} userLocation={PHILLY} />,
+      );
+      const filterInput = container.querySelector("input[type='search']") as HTMLInputElement;
+      fireEvent.change(filterInput, { target: { value: "philadelphia" } });
+      const items = screen.getAllByRole("listitem");
+      expect(items).toHaveLength(3);
+      expect(items[0]?.textContent).toContain("9th and Poplar");
+    });
+  });
+
+  describe("NearMe button → onLocation callback (wires up to SyncedMapList)", () => {
+    it("forwards a successful geo fix to the onLocation prop", async () => {
+      installGeolocation({ latitude: PHILLY.lat, longitude: PHILLY.lng });
+      const onLocation = vi.fn();
+      render(<HomeParkList parks={PARKS} onLocation={onLocation} />);
+      fireEvent.click(screen.getByRole("button", { name: /find parks near me/i }));
+      await waitFor(() => {
+        expect(onLocation).toHaveBeenCalledWith(PHILLY.lat, PHILLY.lng);
+      });
+    });
+
+    it("on denial: surfaces an inline alert AND calls onError", async () => {
+      installGeolocation("deny");
+      const onError = vi.fn();
+      render(<HomeParkList parks={PARKS} onError={onError} />);
+      fireEvent.click(screen.getByRole("button", { name: /find parks near me/i }));
+      await waitFor(() => {
+        expect(screen.getByRole("alert")).toBeInTheDocument();
+        expect(onError).toHaveBeenCalledWith("denied");
+      });
+    });
+  });
+
   describe("zero parks (defensive)", () => {
     it("renders gracefully", () => {
       render(<HomeParkList parks={[]} />);
-      // No list — empty filter shows no parks message? Actually we only show
-      // the "no parks match" copy when the filter narrows to 0. With 0 input
-      // parks and empty filter, we should just render no list. That's fine —
-      // the heading + filter input still render.
       expect(screen.getByRole("heading")).toBeInTheDocument();
       expect(screen.queryByRole("list")).not.toBeInTheDocument();
     });

@@ -22,16 +22,9 @@ beforeEach(() => {
 });
 
 describe("parseMapUrlState — pure validation", () => {
-  it("returns valid view + filtered=true when all params are sane", () => {
-    const r = parseMapUrlState(new URLSearchParams("lat=40.5&lng=-77.5&zoom=10&filtered=1"));
+  it("returns a valid view when lat/lng/zoom are sane", () => {
+    const r = parseMapUrlState(new URLSearchParams("lat=40.5&lng=-77.5&zoom=10"));
     expect(r.view).toEqual({ lat: 40.5, lng: -77.5, zoom: 10 });
-    expect(r.filtered).toBe(true);
-  });
-
-  it("returns view but filtered=false when filtered param is absent", () => {
-    const r = parseMapUrlState(new URLSearchParams("lat=40&lng=-77&zoom=8"));
-    expect(r.view).toEqual({ lat: 40, lng: -77, zoom: 8 });
-    expect(r.filtered).toBe(false);
   });
 
   it("returns null view when any param is missing", () => {
@@ -58,38 +51,34 @@ describe("parseMapUrlState — pure validation", () => {
     expect(parseMapUrlState(new URLSearchParams("lat=40&lng=-77&zoom=30")).view).toBeNull();
   });
 
-  it("ignores filtered=1 when view is invalid (consistency rule)", () => {
-    const r = parseMapUrlState(new URLSearchParams("filtered=1"));
-    expect(r.view).toBeNull();
-    expect(r.filtered).toBe(false);
-  });
-
-  it("treats filtered=anything-other-than-1 as false", () => {
-    const r = parseMapUrlState(new URLSearchParams("lat=40&lng=-77&zoom=10&filtered=true"));
-    expect(r.filtered).toBe(false);
+  it("ignores stale filtered=1 from URLs in the wild (legacy param, no longer honored)", () => {
+    // The bbox filter shipped briefly in phase 10; older shared links may
+    // still carry filtered=1. parseMapUrlState now ignores it — viewport
+    // alone determines initialView; the list always reflects the current
+    // map center via sort, never a filter.
+    const r = parseMapUrlState(new URLSearchParams("lat=40&lng=-77&zoom=10&filtered=1"));
+    expect(r.view).toEqual({ lat: 40, lng: -77, zoom: 10 });
   });
 });
 
 describe("useMapUrlState — React hook integration", () => {
   it("exposes initialView from URL on mount", () => {
-    currentSearchParams = new URLSearchParams("lat=40.5&lng=-77.5&zoom=10&filtered=1");
+    currentSearchParams = new URLSearchParams("lat=40.5&lng=-77.5&zoom=10");
     const { result } = renderHook(() => useMapUrlState());
     expect(result.current.initialView).toEqual({ lat: 40.5, lng: -77.5, zoom: 10 });
-    expect(result.current.filteredFromUrl).toBe(true);
   });
 
   it("initialView is null when URL params are absent", () => {
     currentSearchParams = new URLSearchParams("");
     const { result } = renderHook(() => useMapUrlState());
     expect(result.current.initialView).toBeNull();
-    expect(result.current.filteredFromUrl).toBe(false);
   });
 
   it("writeViewport does NOT call router.replace when isUserDriven=false (default)", async () => {
     vi.useFakeTimers();
     const { result } = renderHook(() => useMapUrlState());
     act(() => {
-      result.current.writeViewport({ lat: 40, lng: -77, zoom: 9 }, false);
+      result.current.writeViewport({ lat: 40, lng: -77, zoom: 9 });
     });
     await vi.advanceTimersByTimeAsync(500);
     expect(replaceMock).not.toHaveBeenCalled();
@@ -100,7 +89,7 @@ describe("useMapUrlState — React hook integration", () => {
     const { result } = renderHook(() => useMapUrlState());
     act(() => {
       result.current.setUserDriven(true);
-      result.current.writeViewport({ lat: 40.5, lng: -77.5, zoom: 10 }, true);
+      result.current.writeViewport({ lat: 40.5, lng: -77.5, zoom: 10 });
     });
     // Before debounce window
     await vi.advanceTimersByTimeAsync(100);
@@ -112,19 +101,6 @@ describe("useMapUrlState — React hook integration", () => {
     expect(url).toContain("lat=40.5000");
     expect(url).toContain("lng=-77.5000");
     expect(url).toContain("zoom=10");
-    expect(url).toContain("filtered=1");
-  });
-
-  it("omits filtered=1 from URL when filtered=false", async () => {
-    vi.useFakeTimers();
-    const { result } = renderHook(() => useMapUrlState());
-    act(() => {
-      result.current.setUserDriven(true);
-      result.current.writeViewport({ lat: 40, lng: -77, zoom: 9 }, false);
-    });
-    await vi.advanceTimersByTimeAsync(400);
-    expect(replaceMock).toHaveBeenCalledOnce();
-    const [url] = replaceMock.mock.calls[0]!;
     expect(url).not.toContain("filtered");
   });
 
@@ -133,9 +109,9 @@ describe("useMapUrlState — React hook integration", () => {
     const { result } = renderHook(() => useMapUrlState());
     act(() => {
       result.current.setUserDriven(true);
-      result.current.writeViewport({ lat: 40, lng: -77, zoom: 9 }, false);
-      result.current.writeViewport({ lat: 41, lng: -77, zoom: 9 }, false);
-      result.current.writeViewport({ lat: 42, lng: -77, zoom: 9 }, false);
+      result.current.writeViewport({ lat: 40, lng: -77, zoom: 9 });
+      result.current.writeViewport({ lat: 41, lng: -77, zoom: 9 });
+      result.current.writeViewport({ lat: 42, lng: -77, zoom: 9 });
     });
     await vi.advanceTimersByTimeAsync(400);
     expect(replaceMock).toHaveBeenCalledOnce();
