@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import { ResponsiveImage } from "./ResponsiveImage";
 
 export interface NearbyCardItem {
@@ -78,9 +80,9 @@ export function NearbyCard({ item }: Props) {
       {...(item.id !== undefined ? { "data-park-id": String(item.id) } : {})}
     >
       {item.href ? (
-        <a href={item.href} className="flex items-center gap-3 px-3 py-3">
+        <Link href={item.href} className="flex items-center gap-3 px-3 py-3">
           {inner}
-        </a>
+        </Link>
       ) : (
         <div className="flex items-center gap-3 px-3 py-3">{inner}</div>
       )}

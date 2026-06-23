@@ -35,6 +35,7 @@
 import "leaflet/dist/leaflet.css";
 
 import L from "leaflet";
+import { useRouter } from "next/navigation";
 import { useEffect, useRef } from "react";
 
 // Bundler footgun fix: Leaflet's default icon URLs point at paths that don't
@@ -182,6 +183,13 @@ export function MapView({
   const onMarkerClickRef = useRef<MapViewProps["onMarkerClick"]>(onMarkerClick);
   const onPopupOpenRef = useRef<MapViewProps["onPopupOpen"]>(onPopupOpen);
   const onPopupCloseRef = useRef<MapViewProps["onPopupClose"]>(onPopupClose);
+  // D6.2 — router-aware popup link: the popup's "View profile" <a> intercepts
+  // its own click and calls router.push(href) so the intercepting-routes
+  // modal opens instead of a full page navigation. The router ref pattern
+  // matches the other callback refs above: init effect runs once, the ref
+  // gives it access to the latest router across renders without re-init.
+  const router = useRouter();
+  const routerRef = useRef<ReturnType<typeof useRouter>>(router);
 
   // Keep callback refs current without re-running init.
   useEffect(() => {
@@ -196,6 +204,9 @@ export function MapView({
   useEffect(() => {
     onPopupCloseRef.current = onPopupClose;
   }, [onPopupClose]);
+  useEffect(() => {
+    routerRef.current = router;
+  }, [router]);
 
   // Init effect — runs once. Intentionally empty deps; capturing `parks` by
   // closure is fine because the homepage is force-static (see
@@ -249,7 +260,13 @@ export function MapView({
       // cursor → pointerover fires → openPopup again → infinite stutter.
       // With autoPan off, popups near the map edge may clip slightly;
       // acceptable tradeoff for stability.
-      marker.bindPopup(() => buildPopupNode(park), { autoPan: false });
+      marker.bindPopup(
+        () =>
+          buildPopupNode(park, (href) => {
+            routerRef.current.push(href);
+          }),
+        { autoPan: false },
+      );
       marker.on("click", () => onMarkerClickRef.current?.(park.id));
       marker.on("popupopen", () => onPopupOpenRef.current?.(park.id));
       marker.on("popupclose", () => onPopupCloseRef.current?.(park.id));

@@ -129,6 +129,13 @@ const { mapInstance, tileLayerInstance, createdMarkers, L } = vi.hoisted(() => {
   };
 });
 
+// D6.2 — MapView calls useRouter() to drive the popup's router-aware click.
+// Stub with a vi.fn so individual tests can assert router.push calls.
+const routerPush = vi.fn();
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: routerPush, replace: vi.fn(), back: vi.fn(), forward: vi.fn(), refresh: vi.fn(), prefetch: vi.fn() }),
+}));
+
 vi.mock("leaflet", () => ({ default: L }));
 // Leaflet ships its CSS as a real file — vitest config has css:false but the
 // `?inline` query is sometimes still imported. Mock the CSS paths so the
@@ -177,6 +184,7 @@ beforeEach(() => {
   // createdMarkers is the source of truth for "what markers exist this test".
   // Clear it so each test starts with no leaked markers from prior renders.
   createdMarkers.length = 0;
+  routerPush.mockClear();
   L.map.mockClear();
   L.tileLayer.mockClear();
   L.marker.mockClear();
@@ -522,5 +530,43 @@ describe("MapView — popup options (autoPan disabled to prevent hover stutter)"
       const [, opts] = calls[0]!;
       expect(opts).toEqual({ autoPan: false });
     }
+  });
+});
+
+describe("MapView — D6.2 router-aware popup link", () => {
+  it("plain-click on the popup's View profile link calls router.push (no full nav)", () => {
+    render(<MapView parks={PA_PARKS} />);
+    // Invoke the popup factory for the first marker — that's what Leaflet
+    // does lazily on first popup-open. The factory returns the DOM node.
+    const factory = createdMarkers[0]!.bindPopup.mock.calls[0]![0] as () => HTMLElement;
+    const node = factory();
+    document.body.appendChild(node);
+    const link = node.querySelector("a.map-popup__link") as HTMLAnchorElement;
+    expect(link).not.toBeNull();
+    // Native dispatchEvent fires a click; the link's installed listener
+    // intercepts and calls router.push instead of full navigation.
+    const event = new MouseEvent("click", { bubbles: true, cancelable: true, button: 0 });
+    link.dispatchEvent(event);
+    expect(routerPush).toHaveBeenCalledExactlyOnceWith("/park/fdr");
+    expect(event.defaultPrevented).toBe(true);
+    document.body.removeChild(node);
+  });
+
+  it("modifier-click (metaKey) preserves browser default (no router.push, no preventDefault)", () => {
+    render(<MapView parks={PA_PARKS} />);
+    const factory = createdMarkers[0]!.bindPopup.mock.calls[0]![0] as () => HTMLElement;
+    const node = factory();
+    document.body.appendChild(node);
+    const link = node.querySelector("a.map-popup__link") as HTMLAnchorElement;
+    const event = new MouseEvent("click", {
+      bubbles: true,
+      cancelable: true,
+      button: 0,
+      metaKey: true,
+    });
+    link.dispatchEvent(event);
+    expect(routerPush).not.toHaveBeenCalled();
+    expect(event.defaultPrevented).toBe(false);
+    document.body.removeChild(node);
   });
 });
