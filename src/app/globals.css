@@ -77,3 +77,36 @@ body[data-map-mounted="true"] .map-fallback-list {
   border: 2px solid #ffffff;
   box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.4);
 }
+
+/* Park-detail intercept modal — desktop default is centered max-w-2xl (from
+   the ModalShell className). Mobile (< lg breakpoint, 1024px) goes full
+   viewport so the modal "looks like a new page": no border-radius, fills
+   100dvh and 100vw, scrolls internally. Back arrow lives top-left, the X
+   button is hidden via Tailwind utility classes on ModalShell. */
+@media (max-width: 1023px) {
+  .park-modal {
+    width: 100vw;
+    height: 100dvh;
+    max-width: 100vw;
+    max-height: 100dvh;
+    margin: 0;
+    border-radius: 0;
+    border: 0;
+  }
+  .park-modal .park-modal__content {
+    min-height: 100dvh;
+    overflow-y: auto;
+  }
+}
+
+/* Desktop polish — bound the inner scroll height to the modal height so the
+   16-section profile scrolls internally rather than blowing past the dialog. */
+@media (min-width: 1024px) {
+  .park-modal {
+    max-height: 90dvh;
+  }
+  .park-modal .park-modal__content {
+    max-height: 90dvh;
+    overflow-y: auto;
+  }
+}

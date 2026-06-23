@@ -15,8 +15,14 @@ export const metadata: Metadata = {
 
 export default function RootLayout({
   children,
+  modal,
 }: {
   children: React.ReactNode;
+  // Next.js parallel-routes @modal slot. Renders src/app/@modal/default.tsx
+  // (null) on every page except when an intercepting route at
+  // src/app/@modal/(.)park/[slug] matches a client-side navigation from /.
+  // See docs/designs/park-modal.md for the full pattern.
+  modal: React.ReactNode;
 }) {
   return (
     <html lang="en">
@@ -30,6 +36,7 @@ export default function RootLayout({
         </a>
         <SiteHeader />
         {children}
+        {modal}
         <Footer />
       </body>
     </html>

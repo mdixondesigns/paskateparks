@@ -1,5 +1,6 @@
 import "server-only";
 
+import type { Metadata } from "next";
 import { asc, eq, ne, isNotNull, and, inArray } from "drizzle-orm";
 
 import { db } from "@/db/client";
@@ -83,6 +84,24 @@ export async function getParkBySlug(slug: string) {
 }
 
 export type ParkWithRelations = NonNullable<Awaited<ReturnType<typeof getParkBySlug>>>;
+
+/**
+ * Single source of truth for park-page metadata (title + description).
+ * Called by both the standalone route at `src/app/park/[slug]/page.tsx` AND
+ * the intercept route at `src/app/@modal/(.)park/[slug]/page.tsx` (eng-review
+ * D3 — DRY the duplication that would otherwise drift). Future additions
+ * (OG image, twitter card, JSON-LD merge) land here and apply to both routes.
+ */
+export async function parkMetadata(slug: string): Promise<Metadata> {
+  const park = await getParkBySlug(slug);
+  if (!park) return { title: "Park not found" };
+  return {
+    title: `${park.name} — Pennsylvania Skateparks`,
+    description:
+      park.description?.slice(0, 160) ??
+      `Skatepark in ${park.city}, ${park.state}. Park rules, amenities, photos, and directions.`,
+  };
+}
 
 /**
  * All OPEN parks with non-null coords — feed for Nearby Parks at build time

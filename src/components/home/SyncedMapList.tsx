@@ -1,6 +1,9 @@
 "use client";
 
-// Phase 10 — synced map+list client island for /.
+// Phase 10 — synced map+list client island for /. Park-modal phase refactored
+// the click semantics: list cards are now Next <Link> elements, and clicking
+// a card opens the park-detail intercept modal (src/app/@modal/(.)park/[slug])
+// rather than navigating away. The homepage stays mounted underneath.
 //
 // Two-pane synced view: list left, map right (desktop). List HTML is SSR'd
 // by app/page.tsx (preserves D6 SEO bet); this client island hydrates the
@@ -9,17 +12,27 @@
 //   ┌─ State (lifted from HomeParkList + MapView) ────────────────────────┐
 //   │  userLocation     ← single source for both panes (blue dot + sort)  │
 //   │  mapCenter        ← list sorts by distance from map center on pan   │
-//   │  popupOpenForId   ← persistent .card-selected while popup is open   │
+//   │  popupOpenForId   ← popup-driven highlight target (hover/click)     │
+//   │  modalParkId      ← URL-driven highlight target — derived from      │
+//   │                     usePathname() matching /park/<slug>. While the  │
+//   │                     intercept modal is open, the matching list      │
+//   │                     card stays highlighted underneath.              │
+//   │  selectedId       ← modalParkId ?? popupOpenForId (modal wins).     │
+//   │                     Drives the persistent .card-selected highlight. │
 //   │  hoveredParkId    ← list hover/focus → openPopup on the map         │
 //   └─────────────────────────────────────────────────────────────────────┘
 //
-// Click-sync direction asymmetry: list cards are <a href="/park/<slug>"> so
-// clicking a card navigates away. List → map sync is instead via hover/focus
-// (opens popup without leaving the page). Marker → card sync via popupopen
-// (scrolls card into view + .card-selected highlight that persists until the
-// popup is dismissed).
+// Click-sync direction: list cards are <Link>; clicking opens the modal,
+// URL updates to /park/<slug>, modalParkId becomes set, .card-selected
+// highlights the card. While the modal is open the background list/map is
+// `inert` (per <dialog>.showModal() — D6.1), so hover popups can't fire.
+// List → map sync still drives via hover/focus (openPopup, no zoom).
+// Marker → card sync via popupopen scrolls the card into view (in
+// handleMarkerClick) and adds .card-selected; popupclose removes it
+// unless the modal route is open.
 
 import dynamic from "next/dynamic";
+import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { hasCoords } from "@/lib/has-coords";
@@ -51,11 +64,12 @@ interface Props {
 }
 
 export function SyncedMapList({ parks }: Props) {
+  const pathname = usePathname();
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number } | null>(null);
   // popupOpenForId: which park's marker has its popup currently displayed.
-  // Set by Leaflet's popupopen event, cleared by popupclose. Drives the
-  // persistent .card-selected highlight + scrollIntoView on the list card.
+  // Set by Leaflet's popupopen event, cleared by popupclose. One of the two
+  // inputs to selectedId; the other is modalParkId (derived from pathname).
   const [popupOpenForId, setPopupOpenForId] = useState<number | null>(null);
   // hoveredParkId: list-card hover/focus target. Driven by delegated
   // pointerover/focusin on the list container, gated to hover-capable
@@ -126,7 +140,25 @@ export function SyncedMapList({ parks }: Props) {
     [parks],
   );
 
-  // popupOpenForId effect — toggle .card-selected on the matching list card.
+  // modalParkId — derived from the URL pathname. When the park-detail
+  // intercept modal is open, pathname matches /park/<slug>; we resolve the
+  // slug back to a park id so the matching list card stays highlighted while
+  // the modal is layered over the homepage.
+  const modalParkId = useMemo(() => {
+    if (!pathname) return null;
+    const m = pathname.match(/^\/park\/([^/]+)$/);
+    if (!m) return null;
+    const slug = decodeURIComponent(m[1]!);
+    return parks.find((p) => p.slug === slug)?.id ?? null;
+  }, [pathname, parks]);
+
+  // selectedId — single source of truth for the .card-selected highlight.
+  // modalParkId wins because the modal is a stronger commitment than a
+  // transient hover popup. In practice while the modal is open the background
+  // is inert and popupOpenForId is null, but the precedence is the contract.
+  const selectedId = modalParkId ?? popupOpenForId;
+
+  // selectedId effect — toggle .card-selected on the matching list card.
   // Scroll-into-view is intentionally NOT here; it lives in handleMarkerClick
   // so the trigger is unambiguous (marker click only, never hover/focus).
   useEffect(() => {
@@ -134,14 +166,14 @@ export function SyncedMapList({ parks }: Props) {
       flashedElRef.current.classList.remove("card-selected");
       flashedElRef.current = null;
     }
-    if (popupOpenForId == null) return;
+    if (selectedId == null) return;
     const root = listContainerRef.current;
     if (!root) return;
-    const el = root.querySelector<HTMLElement>(`[data-park-id="${popupOpenForId}"]`);
+    const el = root.querySelector<HTMLElement>(`[data-park-id="${selectedId}"]`);
     if (!el) return;
     el.classList.add("card-selected");
     flashedElRef.current = el;
-  }, [popupOpenForId]);
+  }, [selectedId]);
 
   // Cleanup on unmount — any active highlight must not leak DOM state if
   // the wrapper is torn down (e.g., route change in dev).

@@ -47,6 +47,8 @@ vi.mock("next/navigation", () => ({
     prefetch: vi.fn(),
   }),
   useSearchParams: () => new URLSearchParams(),
+  // Park-modal phase: SyncedMapList derives modalParkId from the pathname.
+  usePathname: () => "/",
 }));
 
 import Home from "./page";
