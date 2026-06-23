@@ -126,13 +126,13 @@ export function SyncedMapList({ parks }: Props) {
     [parks],
   );
 
-  // popupOpenForId effect — scroll the matching list card into view and
-  // toggle .card-selected. Imperative DOM manipulation keeps NearbyCard a
-  // pure presentational component (no per-card "selected" prop plumbing).
+  // popupOpenForId effect — toggle .card-selected on the matching list
+  // card. Scroll into view only for click-driven opens (marker click on the
+  // map); hover-driven opens skip the scroll because (a) the user is already
+  // looking at the card they're hovering, and (b) scrolling the list under
+  // a stationary cursor causes cards to layout-shift under it, firing a new
+  // pointerover, which opens a new popup — infinite churn.
   useEffect(() => {
-    // Always clean up the prior card's class first — handles both the
-    // popup-close path (popupOpenForId → null) and the popup-switch path
-    // (A → B closes A then opens B; we re-enter the effect for B).
     if (flashedElRef.current) {
       flashedElRef.current.classList.remove("card-selected");
       flashedElRef.current = null;
@@ -142,9 +142,14 @@ export function SyncedMapList({ parks }: Props) {
     if (!root) return;
     const el = root.querySelector<HTMLElement>(`[data-park-id="${popupOpenForId}"]`);
     if (!el) return;
-    el.scrollIntoView({ behavior: "smooth", block: "center" });
     el.classList.add("card-selected");
     flashedElRef.current = el;
+    // hoveredParkIdRef is updated by the ref-sync effect declared earlier in
+    // this component, so it reflects the hover state at the time popupopen
+    // fired. When they match, the open was hover-driven → no scroll.
+    if (hoveredParkIdRef.current !== popupOpenForId) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
   }, [popupOpenForId]);
 
   // Cleanup on unmount — any active highlight must not leak DOM state if

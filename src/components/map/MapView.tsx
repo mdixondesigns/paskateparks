@@ -251,7 +251,14 @@ export function MapView({
       // Lazy popup: the factory runs on first open, not at marker creation.
       // For 48 pins the upfront cost is fine, but the lazy form locks in
       // the scaling pattern as the directory grows past the 200-row tripwire.
-      marker.bindPopup(() => buildPopupNode(park));
+      //
+      // autoPan: false — Leaflet's default is to slide the map so the popup
+      // stays on-screen. That moveend re-enters handleMoveEnd → updates
+      // mapCenter → re-sorts the list → cards layout-shift under a stationary
+      // cursor → pointerover fires → openPopup again → infinite stutter. With
+      // autoPan off, popups near the map edge may clip slightly; acceptable
+      // tradeoff for stability.
+      marker.bindPopup(() => buildPopupNode(park), { autoPan: false });
       marker.on("click", () => onMarkerClickRef.current?.(park.id));
       // popupopen/popupclose drive the persistent .card-selected highlight
       // on the list. Fires for marker-click opens AND hover-driven opens —
@@ -376,12 +383,18 @@ export function MapView({
 
   // hoveredParkId effect — list-card hover/focus target. Open the popup
   // WITHOUT zooming the map (hover should never change viewport). If the
-  // marker is inside a collapsed cluster, openPopup no-ops — accepted
-  // tradeoff (the user can click the card to navigate, or zoom in first).
+  // marker is hidden inside a collapsed cluster, skip the call entirely —
+  // openPopup would show the popup at the marker's true lat/lng, which is
+  // visually under the cluster bubble (confusing) AND the bound popup ends
+  // up tracking a hidden anchor as the user pans. Clustered hovers
+  // deliberately have no map feedback; user can zoom in or click the card
+  // to navigate.
   useEffect(() => {
     if (hoveredParkId == null) return;
     const marker = markersByParkIdRef.current.get(hoveredParkId);
-    if (!marker) return;
+    const cluster = clusterGroupRef.current;
+    if (!marker || !cluster) return;
+    if (cluster.getVisibleParent(marker) !== marker) return;
     marker.openPopup();
   }, [hoveredParkId]);
 
