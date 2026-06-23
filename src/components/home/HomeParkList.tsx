@@ -31,6 +31,17 @@ const ABOVE_FOLD_PRIORITY_COUNT = 3;
 
 interface Props {
   parks: HomeParkRow[];
+  /**
+   * T11 — synced map+list wrapper composes the bbox-filter status into
+   * HomeParkList's existing aria-live region instead of rendering its own.
+   * Two aria-live regions race each other and screen readers may drop one
+   * or both announcements. When set, this string is appended after the
+   * geolocation/filter status with a separating space, both rendered into
+   * the single role="status" region below.
+   *
+   * Park-profile callers and standalone uses leave this undefined.
+   */
+  bboxStatus?: string | null;
 }
 
 function matchesFilter(park: HomeParkRow, q: string): boolean {
@@ -84,7 +95,7 @@ function toCardItem(
   };
 }
 
-export function HomeParkList({ parks }: Props) {
+export function HomeParkList({ parks, bboxStatus }: Props) {
   const [filter, setFilter] = useState("");
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [geoError, setGeoError] = useState<GeoErrorReason | null>(null);
@@ -151,12 +162,16 @@ export function HomeParkList({ parks }: Props) {
   }, [parks, filter, userLocation]);
 
   const countLabel = pluralize(items.length, "park");
-  const status: string =
+  const baseStatus: string =
     userLocation !== null
       ? `Showing ${countLabel} nearest to you${filter ? ` matching "${filter}"` : ""}.`
       : filter
         ? `Showing ${countLabel} matching "${filter}".`
         : "";
+  // T11: single aria-live region announces both the in-list filter/sort
+  // state AND the wrapper-owned bbox filter. Joined with a space when both
+  // are present; either alone renders cleanly.
+  const status: string = [baseStatus, bboxStatus ?? ""].filter(Boolean).join(" ");
 
   return (
     <section aria-labelledby="park-list-heading" className="px-4 py-4">

@@ -341,13 +341,15 @@ export function SyncedMapList({ parks }: Props) {
         ref={listContainerRef}
         className={`lg:max-h-[100dvh] lg:overflow-y-auto ${mobileMapOpen ? "hidden lg:block" : ""}`}
       >
-        {/* T7 — bbox-filter status + reset. Above the list so users see
-            the count change after clicking "Search this area." aria-live
-            extension (T11) will fold this copy into HomeParkList's existing
-            announcer; for now keep it visible-only. */}
+        {/* T7 — bbox-filter status + reset chip. Visible UI for sighted
+            users; the SAME copy is also piped into HomeParkList's existing
+            role="status" aria-live region via the bboxStatus prop (T11),
+            so screen readers get the announcement on state change. We do
+            not add a second aria-live region here — multiple live regions
+            race each other and SRs may drop one or both announcements. */}
         {filterStatus ? (
           <div className="flex items-center justify-between gap-3 border-b px-4 py-2 text-sm">
-            <span>{filterStatus}</span>
+            <span aria-hidden="true">{filterStatus}</span>
             <button
               type="button"
               onClick={handleSeeAll}
@@ -357,7 +359,7 @@ export function SyncedMapList({ parks }: Props) {
             </button>
           </div>
         ) : null}
-        <HomeParkList parks={filteredParks} />
+        <HomeParkList parks={filteredParks} bboxStatus={filterStatus} />
       </div>
       {/* Map pane. Desktop: sticky right column. Mobile: fixed full-screen
           overlay when mobileMapOpen, hidden otherwise. We use a class
