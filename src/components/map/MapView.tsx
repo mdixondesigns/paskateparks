@@ -7,13 +7,13 @@
 //   │   mount → init useEffect (runs once, deps=[]) ──┐                │
 //   │     • L.map(container)                          │                │
 //   │     • L.tileLayer(CARTO Positron).addTo(map)    │                │
-//   │     • L.markerClusterGroup() — D12              │                │
-//   │     • for each park → L.marker + bindPopup      │                │
+//   │     • for each park → L.marker + bindPopup +    │                │
+//   │                       marker.addTo(map)         │                │
 //   │     • fitBounds(park bbox, padding=40)          │                │
 //   │       └─ degenerate fallback → setView(PA, 7)   │                │
 //   │     • document.body.dataset.mapMounted = "true" │  CMT-3 signal  │
 //   │                                                 ▼                │
-//   │   userLocation effect (deps=[geo.location]) → map.flyTo(loc, 11) │
+//   │   userLocation effect (prop) → map.flyTo + blue dot              │
 //   │                                                                 │
 //   │   unmount → cleanup → map.remove() + clear data-map-mounted     │
 //   └─────────────────────────────────────────────────────────────────┘
@@ -22,18 +22,19 @@
 //   1A — raw Leaflet imperative API (no react-leaflet wrapper)
 //   1F — fitBounds over hardcoded viewport
 //   2A — popups via buildPopupNode (createElement + textContent)
-//   CMT-1 — markercluster KEPT (Philly/Pittsburgh density needs it)
 //   CMT-3 — data-map-mounted swap: visible fallback list goes sr-only on mount
 //   CMT-4 — CARTO Positron tile basemap (was tile.openstreetmap.org in phase 7;
 //           swapped post-ship for a more stylized minimal look and to close
 //           the P1 OSM-public-tile-policy migration TODO)
+//
+// Clustering retired 2026-06-22 — the original "Philly/Pittsburgh density
+// needs it" (CMT-1) was a 1000+-pins assumption. At 48-150 pins the cluster
+// bubbles obscure individual markers and break hover sync (hidden markers
+// can't show popups). Markers go straight on the map now.
 
 import "leaflet/dist/leaflet.css";
-import "leaflet.markercluster/dist/MarkerCluster.css";
-import "leaflet.markercluster/dist/MarkerCluster.Default.css";
 
 import L from "leaflet";
-import "leaflet.markercluster";
 import { useEffect, useRef } from "react";
 
 // Bundler footgun fix: Leaflet's default icon URLs point at paths that don't
@@ -82,10 +83,6 @@ const PA_DEFAULT_ZOOM = 7;
 // single-park fallback (when fitBounds would produce a NaN bbox).
 const CLOSE_ZOOM = 11;
 const FIT_BOUNDS_PADDING: L.PointTuple = [40, 40];
-// Tighter than the Leaflet.markercluster 80px default — ~3× more pins
-// visible at PA-wide zoom while still collapsing the dense Philly+Pittsburgh
-// pockets (CMT-1). Dropped from 40 → 30 to surface more pins per user ask.
-const CLUSTER_RADIUS_PX = 30;
 // Thumbnail-pin geometry. 40px circle (16px icon-anchor offset so the bottom
 // of the ring sits over the actual lat/lng, matching the default Leaflet
 // pin behavior). Popup-anchor pulls the popup up off the ring.
@@ -168,8 +165,7 @@ export function MapView({
 }: MapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
-  const clusterGroupRef = useRef<L.MarkerClusterGroup | null>(null);
-  // park.id → marker, so the selectedParkId effect can find the right marker
+  // park.id → marker, so the hoveredParkId effect can find the right marker
   // without iterating. Cleared in the unmount cleanup.
   const markersByParkIdRef = useRef<Map<number, L.Marker>>(new Map());
   // marker → park.id reverse lookup so popupopen/popupclose can identify
@@ -202,8 +198,8 @@ export function MapView({
   }, [onPopupClose]);
 
   // Init effect — runs once. Intentionally empty deps; capturing `parks` by
-  // closure is fine because the route is force-static (see
-  // src/app/map/page.tsx: `export const dynamic = "force-static"`). Parks
+  // closure is fine because the homepage is force-static (see
+  // src/app/page.tsx: `export const dynamic = "force-static"`). Parks
   // won't change between mount and unmount; webhook revalidation triggers a
   // fresh build, which means a fresh page load + remount. If that route
   // config ever changes (e.g., switching to ISR), revisit this — the stale
@@ -238,8 +234,6 @@ export function MapView({
     });
     tileLayer.addTo(map);
 
-    const clusters = L.markerClusterGroup({ maxClusterRadius: CLUSTER_RADIUS_PX });
-    clusterGroupRef.current = clusters;
     for (const park of parks) {
       // Parks with a hero photo get a thumbnail-circle divIcon; stub parks
       // (no photo yet) fall back to the default Leaflet pin.
@@ -249,27 +243,20 @@ export function MapView({
           })
         : L.marker([park.lat, park.lng]);
       // Lazy popup: the factory runs on first open, not at marker creation.
-      // For 48 pins the upfront cost is fine, but the lazy form locks in
-      // the scaling pattern as the directory grows past the 200-row tripwire.
-      //
       // autoPan: false — Leaflet's default is to slide the map so the popup
       // stays on-screen. That moveend re-enters handleMoveEnd → updates
       // mapCenter → re-sorts the list → cards layout-shift under a stationary
-      // cursor → pointerover fires → openPopup again → infinite stutter. With
-      // autoPan off, popups near the map edge may clip slightly; acceptable
-      // tradeoff for stability.
+      // cursor → pointerover fires → openPopup again → infinite stutter.
+      // With autoPan off, popups near the map edge may clip slightly;
+      // acceptable tradeoff for stability.
       marker.bindPopup(() => buildPopupNode(park), { autoPan: false });
       marker.on("click", () => onMarkerClickRef.current?.(park.id));
-      // popupopen/popupclose drive the persistent .card-selected highlight
-      // on the list. Fires for marker-click opens AND hover-driven opens —
-      // single source of truth for "is a popup currently showing?"
       marker.on("popupopen", () => onPopupOpenRef.current?.(park.id));
       marker.on("popupclose", () => onPopupCloseRef.current?.(park.id));
-      clusters.addLayer(marker);
+      marker.addTo(map);
       markersByParkIdRef.current.set(park.id, marker);
       parkIdByMarkerRef.current.set(marker, park.id);
     }
-    map.addLayer(clusters);
 
     // moveend feeds the wrapper center+zoom for mapCenter-based list sort
     // and the debounced URL write. We DON'T try to detect "was this user-
@@ -324,7 +311,6 @@ export function MapView({
     return () => {
       map.remove();
       mapRef.current = null;
-      clusterGroupRef.current = null;
       markersByParkIdRef.current.clear();
       delete document.body.dataset.mapMounted;
     };
@@ -368,33 +354,21 @@ export function MapView({
     map.flyTo(latlng, CLOSE_ZOOM, { duration: 1.5 });
   }, [userLocation]);
 
-  // selectedParkId effect — marker-click target. Expand any containing
-  // cluster, fly to the marker, open its popup. zoomToShowLayer is the
-  // markercluster API for "the marker might be inside a collapsed cluster"
-  // — without it, openPopup on a clustered marker no-ops because the
-  // marker isn't in the DOM until the cluster expands.
+  // selectedParkId effect — marker-click target. Open the popup directly
+  // (no cluster expansion needed — clustering was retired 2026-06-22).
   useEffect(() => {
     if (selectedParkId == null) return;
     const marker = markersByParkIdRef.current.get(selectedParkId);
-    const cluster = clusterGroupRef.current;
-    if (!marker || !cluster) return;
-    cluster.zoomToShowLayer(marker, () => marker.openPopup());
+    if (!marker) return;
+    marker.openPopup();
   }, [selectedParkId]);
 
   // hoveredParkId effect — list-card hover/focus target. Open the popup
-  // WITHOUT zooming the map (hover should never change viewport). If the
-  // marker is hidden inside a collapsed cluster, skip the call entirely —
-  // openPopup would show the popup at the marker's true lat/lng, which is
-  // visually under the cluster bubble (confusing) AND the bound popup ends
-  // up tracking a hidden anchor as the user pans. Clustered hovers
-  // deliberately have no map feedback; user can zoom in or click the card
-  // to navigate.
+  // WITHOUT zooming or panning the map (hover should never change viewport).
   useEffect(() => {
     if (hoveredParkId == null) return;
     const marker = markersByParkIdRef.current.get(hoveredParkId);
-    const cluster = clusterGroupRef.current;
-    if (!marker || !cluster) return;
-    if (cluster.getVisibleParent(marker) !== marker) return;
+    if (!marker) return;
     marker.openPopup();
   }, [hoveredParkId]);
 

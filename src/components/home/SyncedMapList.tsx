@@ -35,10 +35,10 @@ import type { MapMoveEnd } from "@/components/map/MapView";
 // that opens a full-screen overlay (lazy-mount).
 const DESKTOP_MIN_PX = 1024;
 
-// Programmatic-move window: initial fit, find-me flyTo, and selectedParkId
-// zoomToShowLayer all fire moveends that should NOT write the URL or update
-// the user-driven mapCenter for sort. Timer-based because some animations
-// (markercluster zoom) fire multiple moveends.
+// Programmatic-move window: initial fit + find-me flyTo fire moveends that
+// should NOT write the URL or update the user-driven mapCenter for sort.
+// Timer-based because Leaflet's flyTo animation fires multiple moveends as
+// it eases toward the target.
 const PROGRAMMATIC_MOVE_WINDOW_MS = 800;
 
 const MapView = dynamic(() => import("@/components/map/MapView").then((m) => m.MapView), {
@@ -127,11 +127,11 @@ export function SyncedMapList({ parks }: Props) {
   );
 
   // popupOpenForId effect — toggle .card-selected on the matching list
-  // card. Scroll into view only for click-driven opens (marker click on the
-  // map); hover-driven opens skip the scroll because (a) the user is already
-  // looking at the card they're hovering, and (b) scrolling the list under
-  // a stationary cursor causes cards to layout-shift under it, firing a new
-  // pointerover, which opens a new popup — infinite churn.
+  // card. We deliberately do NOT scroll the card into view; scrolling the
+  // list under a stationary cursor causes pointerover to fire for whatever
+  // card lands under the cursor, opening that popup, scrolling again — a
+  // self-amplifying loop. The .card-selected highlight is sufficient
+  // feedback; user can scroll manually to find the card if needed.
   useEffect(() => {
     if (flashedElRef.current) {
       flashedElRef.current.classList.remove("card-selected");
@@ -144,12 +144,6 @@ export function SyncedMapList({ parks }: Props) {
     if (!el) return;
     el.classList.add("card-selected");
     flashedElRef.current = el;
-    // hoveredParkIdRef is updated by the ref-sync effect declared earlier in
-    // this component, so it reflects the hover state at the time popupopen
-    // fired. When they match, the open was hover-driven → no scroll.
-    if (hoveredParkIdRef.current !== popupOpenForId) {
-      el.scrollIntoView({ behavior: "smooth", block: "center" });
-    }
   }, [popupOpenForId]);
 
   // Cleanup on unmount — any active highlight must not leak DOM state if

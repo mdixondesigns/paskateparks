@@ -12,7 +12,7 @@ import { render } from "@testing-library/react";
 // `import MapView` at the bottom of this file) can close over them.
 // vi.fn<(...args: unknown[]) => unknown>() widens the call signature so
 // .mock.calls[i][j] doesn't index into a `[]` tuple type.
-const { mapInstance, tileLayerInstance, clusterGroupInstance, createdMarkers, L } = vi.hoisted(() => {
+const { mapInstance, tileLayerInstance, createdMarkers, L } = vi.hoisted(() => {
   type AnyFn = (...args: unknown[]) => unknown;
   // Event handlers attached to the map via `map.on(event, cb)` — keyed by
   // event name so tests can fire them imperatively.
@@ -75,19 +75,6 @@ const { mapInstance, tileLayerInstance, clusterGroupInstance, createdMarkers, L 
     cb?.();
     return tile;
   });
-  const zoomToShowLayerImpl = ((_marker: unknown, cb?: () => void) => {
-    cb?.();
-  }) as unknown as AnyFn;
-  // Default getVisibleParent: every marker is its own visible parent (no
-  // collapsed clusters). Tests that want to simulate a clustered marker
-  // override this on the instance.
-  const getVisibleParentImpl = ((marker: unknown) => marker) as unknown as AnyFn;
-  const cluster = {
-    addLayer: vi.fn<AnyFn>(),
-    // Leaflet.markercluster APIs we depend on.
-    zoomToShowLayer: vi.fn<AnyFn>(zoomToShowLayerImpl),
-    getVisibleParent: vi.fn<AnyFn>(getVisibleParentImpl),
-  };
   // Tracks every marker created via L.marker — tests use this to find a
   // specific marker by park-coord and assert per-marker behavior (click
   // handlers, openPopup, etc.).
@@ -104,12 +91,10 @@ const { mapInstance, tileLayerInstance, clusterGroupInstance, createdMarkers, L 
   return {
     mapInstance: map,
     tileLayerInstance: tile,
-    clusterGroupInstance: cluster,
     createdMarkers,
     L: {
       map: vi.fn<AnyFn>(() => map),
       tileLayer: vi.fn<AnyFn>(() => tile),
-      markerClusterGroup: vi.fn<AnyFn>(() => cluster),
       marker: vi.fn<AnyFn>(((coord: [number, number]) => {
         const handlers = new Map<string, Array<(...args: unknown[]) => unknown>>();
         // Build the mock skeleton first so the on/bindPopup impls can
@@ -145,13 +130,10 @@ const { mapInstance, tileLayerInstance, clusterGroupInstance, createdMarkers, L 
 });
 
 vi.mock("leaflet", () => ({ default: L }));
-vi.mock("leaflet.markercluster", () => ({}));
 // Leaflet ships its CSS as a real file — vitest config has css:false but the
 // `?inline` query is sometimes still imported. Mock the CSS paths so the
 // import doesn't try to resolve actual CSS.
 vi.mock("leaflet/dist/leaflet.css", () => ({}));
-vi.mock("leaflet.markercluster/dist/MarkerCluster.css", () => ({}));
-vi.mock("leaflet.markercluster/dist/MarkerCluster.Default.css", () => ({}));
 // Image imports under Next return StaticImageData { src: string, ... }.
 vi.mock("leaflet/dist/images/marker-icon.png", () => ({
   default: { src: "/mock-icon.png", width: 25, height: 41 },
@@ -192,19 +174,11 @@ beforeEach(() => {
     cb?.();
     return tileLayerInstance;
   });
-  clusterGroupInstance.addLayer.mockClear();
-  clusterGroupInstance.zoomToShowLayer.mockClear();
-  clusterGroupInstance.getVisibleParent.mockClear();
-  // Reset default: every marker is visible (no clusters).
-  clusterGroupInstance.getVisibleParent.mockImplementation(
-    ((marker: unknown) => marker) as unknown as (...args: unknown[]) => unknown,
-  );
   // createdMarkers is the source of truth for "what markers exist this test".
   // Clear it so each test starts with no leaked markers from prior renders.
   createdMarkers.length = 0;
   L.map.mockClear();
   L.tileLayer.mockClear();
-  L.markerClusterGroup.mockClear();
   L.marker.mockClear();
   L.divIcon.mockClear();
   // Note: don't clear L.Icon.Default.mergeOptions — it's called once at module
@@ -237,13 +211,13 @@ describe("MapView — Leaflet init flow", () => {
     expect(mapInstance.attributionControl.setPosition).toHaveBeenCalledWith("topright");
   });
 
-  it("creates one markerClusterGroup and adds one marker per park (CMT-1: D12)", () => {
+  it("creates one marker per park and adds each directly to the map (clustering retired)", () => {
     render(<MapView parks={PA_PARKS} />);
-    expect(L.markerClusterGroup).toHaveBeenCalledTimes(1);
-    expect(L.markerClusterGroup).toHaveBeenCalledWith({ maxClusterRadius: 30 });
     expect(L.marker).toHaveBeenCalledTimes(PA_PARKS.length);
-    expect(clusterGroupInstance.addLayer).toHaveBeenCalledTimes(PA_PARKS.length);
-    // Marker coords match park lat/lng order.
+    // Each marker calls .addTo(map) — no markerClusterGroup intermediary.
+    for (const m of createdMarkers) {
+      expect(m.addTo).toHaveBeenCalledWith(mapInstance);
+    }
     const calledCoords = L.marker.mock.calls.map((c) => c[0]);
     expect(calledCoords).toEqual([
       [39.91, -75.18],
@@ -404,21 +378,17 @@ describe("MapView — Leaflet init flow", () => {
       expect(onMarkerClick).toHaveBeenCalledExactlyOnceWith(2);
     });
 
-    it("selectedParkId effect calls cluster.zoomToShowLayer + marker.openPopup", () => {
+    it("selectedParkId effect calls marker.openPopup on the matching marker", () => {
       const { rerender } = render(<MapView parks={PA_PARKS} selectedParkId={null} />);
-      expect(clusterGroupInstance.zoomToShowLayer).not.toHaveBeenCalled();
+      expect(createdMarkers[1]?.openPopup).not.toHaveBeenCalled();
       // Park id=2 = Bayne (PA_PARKS[1]).
       rerender(<MapView parks={PA_PARKS} selectedParkId={2} />);
-      expect(clusterGroupInstance.zoomToShowLayer).toHaveBeenCalledOnce();
-      const [markerArg] = clusterGroupInstance.zoomToShowLayer.mock.calls[0]!;
-      // The mock fires the cb immediately, so openPopup should be invoked.
-      expect((markerArg as { coord: [number, number] }).coord).toEqual([40.5, -80.05]);
-      expect((markerArg as { openPopup: ReturnType<typeof vi.fn> }).openPopup).toHaveBeenCalledOnce();
+      expect(createdMarkers[1]?.openPopup).toHaveBeenCalledOnce();
     });
 
     it("selectedParkId set to a non-existent park id is a no-op (defensive)", () => {
       render(<MapView parks={PA_PARKS} selectedParkId={9999} />);
-      expect(clusterGroupInstance.zoomToShowLayer).not.toHaveBeenCalled();
+      for (const m of createdMarkers) expect(m.openPopup).not.toHaveBeenCalled();
     });
   });
 
@@ -528,37 +498,16 @@ describe("MapView — popup events drive the persistent list highlight", () => {
   });
 });
 
-describe("MapView — hoveredParkId opens popup without zooming", () => {
-  it("calls marker.openPopup on the matching id (no zoomToShowLayer)", () => {
+describe("MapView — hoveredParkId opens popup", () => {
+  it("calls marker.openPopup on the matching id", () => {
     const { rerender } = render(<MapView parks={PA_PARKS} hoveredParkId={null} />);
     expect(createdMarkers[1]?.openPopup).not.toHaveBeenCalled();
     rerender(<MapView parks={PA_PARKS} hoveredParkId={2} />);
-    // Hover sync should NOT zoom — that would yank the map view on every
-    // hover (terrible UX).
-    expect(clusterGroupInstance.zoomToShowLayer).not.toHaveBeenCalled();
     expect(createdMarkers[1]?.openPopup).toHaveBeenCalledOnce();
-  });
-
-  it("skips openPopup when the marker is hidden inside a collapsed cluster", () => {
-    // Simulate: marker for park id=2 (Bayne) is inside a collapsed cluster
-    // — getVisibleParent returns the cluster, not the marker itself.
-    const FAKE_CLUSTER = { __cluster: true };
-    clusterGroupInstance.getVisibleParent.mockImplementation(((marker: unknown) => {
-      const m = marker as { coord?: [number, number] };
-      if (m.coord?.[0] === 40.5) return FAKE_CLUSTER; // Bayne
-      return marker;
-    }) as unknown as (...args: unknown[]) => unknown);
-    const { rerender } = render(<MapView parks={PA_PARKS} hoveredParkId={null} />);
-    rerender(<MapView parks={PA_PARKS} hoveredParkId={2} />);
-    expect(createdMarkers[1]?.openPopup).not.toHaveBeenCalled();
-    // Park id=1 (FDR) is NOT clustered — hover should still open its popup.
-    rerender(<MapView parks={PA_PARKS} hoveredParkId={1} />);
-    expect(createdMarkers[0]?.openPopup).toHaveBeenCalledOnce();
   });
 
   it("non-existent hoveredParkId is a no-op (defensive)", () => {
     render(<MapView parks={PA_PARKS} hoveredParkId={9999} />);
-    expect(clusterGroupInstance.zoomToShowLayer).not.toHaveBeenCalled();
     for (const m of createdMarkers) expect(m.openPopup).not.toHaveBeenCalled();
   });
 });
