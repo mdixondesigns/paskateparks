@@ -1,11 +1,15 @@
-// Phase 6 D4 + D11 — footer renders on every route via layout.tsx.
-//
-// Two links in v1: About + Privacy. The /coaching link is deferred until the
-// owner's coaching destination is finalized (see TODOS.md). Privacy carries
-// the real geolocation-handling copy per CMT-1, since the homepage asks for
-// browser location.
+"use client";
 
+import { usePathname } from "next/navigation";
+
+// Site-wide footer rendered on every route EXCEPT the homepage. The home
+// page has its own compact footer baked into the bottom of the synced list
+// pane (HomeFooter) so the layout reads list-then-footer rather than
+// list-then-map-then-footer. Hiding here keeps the rest of the site (about,
+// privacy, county, obstacle, park standalone) on the canonical layout.
 export function Footer() {
+  const pathname = usePathname();
+  if (pathname === "/") return null;
   return (
     <footer className="mt-12 border-t px-4 py-6 text-sm">
       <nav aria-label="Footer">
