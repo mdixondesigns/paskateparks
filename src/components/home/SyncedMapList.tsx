@@ -127,11 +127,16 @@ export function SyncedMapList({ parks }: Props) {
   );
 
   // popupOpenForId effect — toggle .card-selected on the matching list
-  // card. We deliberately do NOT scroll the card into view; scrolling the
-  // list under a stationary cursor causes pointerover to fire for whatever
-  // card lands under the cursor, opening that popup, scrolling again — a
-  // self-amplifying loop. The .card-selected highlight is sufficient
-  // feedback; user can scroll manually to find the card if needed.
+  // card AND scroll it into view, BUT only when the popup was opened by a
+  // marker click (not by hover/focus). For hover-driven opens the user is
+  // already looking at the card; scrolling the list under a stationary
+  // cursor would cause pointerover churn.
+  //
+  // hover-vs-click detection: by the time popupopen fires from a hover,
+  // hoveredParkIdRef has already been synced to the same id (the hover
+  // event set hoveredParkId → ref-sync committed → MapView's effect called
+  // openPopup → popupopen fires). For a marker click, hoveredParkIdRef is
+  // whatever it was previously (typically null), so the ids won't match.
   useEffect(() => {
     if (flashedElRef.current) {
       flashedElRef.current.classList.remove("card-selected");
@@ -144,6 +149,9 @@ export function SyncedMapList({ parks }: Props) {
     if (!el) return;
     el.classList.add("card-selected");
     flashedElRef.current = el;
+    if (hoveredParkIdRef.current !== popupOpenForId) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
   }, [popupOpenForId]);
 
   // Cleanup on unmount — any active highlight must not leak DOM state if
