@@ -111,29 +111,33 @@ Captured by /plan-eng-review on 2026-05-30. Items the eng review surfaced but ex
 **Context:** Phase 10 D3.2 (eng review, 2026-06-22). Effort: L (probably 2-3 days — extract the wrapper, parameterize the data source, migrate 2 routes, write archive-flavored e2e). The current SyncedMapList does enough state lifting that the boundary is mostly clean; the real work is data-source parameterization and the archive intro-copy block above the synced shell.
 **Depends on:** `/` synced layout shipping (this task block).
 
-### Hover sync — list card ↔ map marker (D3.3)
-**What:** When the user hovers a list card (desktop), highlight the corresponding marker on the map (subtle ring or pin pop). Reverse direction: hovering a marker highlights the card (same .card-flash mechanic, no scroll).
-**Why:** D3.3 was deferred because touch-device hover semantics are messy (long-press? pointer-over without click?) and the bidirectional click-sync we'd actually need to wire (list card → map fly-to) conflicts with the card's `<a href>` navigation. Better UX call once we have actual user feedback on the click-sync direction asymmetry.
-**Pros:** Adds the "I see what you're pointing at on the map" affordance that Zillow-style synced panes are known for. ~S effort because the marker registry (`markersByParkIdRef`) and the card querySelector (`data-park-id`) already exist for the click-sync.
-**Cons:** Touch devices: pointer events fire on tap, so naïve `onMouseEnter`/`onMouseLeave` triggers a flash on every tap. Need `@media (hover: hover)` gating OR pointer-type detection. Mobile users get nothing from this feature, so deferring until desktop usage validates the demand is correct.
-**Context:** Phase 10 D3.3 (eng review, 2026-06-22). Effort: S. Implementation note: `SyncedMapList` already has the marker registry indirectly (via `selectedParkId` + MapView's effect); add a `hoveredParkId` companion state and a non-zoomToShowLayer highlight path.
-**Depends on:** Nothing structural, but pairs naturally with the list-card → map fly-to asymmetry resolution below.
+### ~~Hover sync — list card ↔ map marker (D3.3)~~
+**LANDED 2026-06-22** (Plan A follow-up). `SyncedMapList` now tracks
+`hoveredParkId` via delegated pointerover/focusin listeners on the list
+container, gated to hover-capable pointers (`@media (hover: hover)`) so
+touch devices don't fire popup-open on every tap. The MapView reads
+`hoveredParkId` as a prop and calls `marker.openPopup()` without zooming
+(zoom on hover would yank the viewport). Focus events keep the keyboard
+path working alongside mouse hover. Same registry the marker-click path
+uses — `markersByParkIdRef` — so no new lookup machinery. Popup stays
+open after hover-out by design: user dismisses by clicking elsewhere on
+the map, matching the click-pinned UX from #5.
 
-### Distance-sort respects map center toggle (D3.5)
-**What:** When the user has panned the map to (e.g.) Pittsburgh but their geolocation is still Philadelphia, the list distance-sort uses Philly as the origin. Offer a toggle: "Sort by distance from map center" vs "Sort by distance from me." Default stays at geolocation (the parking-lot P0 case is "I'm here, what's near me").
-**Why:** D3.5 was deferred because the geolocation default is right for the P0 use case (parent at the park looking for nearby alternatives). Map-center sort is a power-user feature that helps the "I'm planning a road trip" flow.
-**Pros:** Unlocks the trip-planning flow without breaking the parking-lot flow. ~S effort because the sort pipeline already accepts any `{lat, lng}` origin (see `findNearby` in `HomeParkList.tsx:122-126`).
-**Cons:** Toggle UX questions: where does it live? Inline radio? Dropdown? Persisted via URL? If usage stays low, every byte of UI for this toggle is debt. Defer until someone asks for it.
-**Context:** Phase 10 D3.5 (eng review, 2026-06-22). Effort: S. Edge case acknowledged: the current "distance from me" sort is the right default; this is purely additive.
-**Depends on:** Nothing.
+### ~~Distance-sort respects map center toggle (D3.5)~~
+**SUPERSEDED 2026-06-22** by Plan A: list sort precedence is now
+`userLocation > mapCenter > alphabetical` with no toggle. mapCenter
+updates silently on every moveend (programmatic or user). userLocation
+wins when both are set — geolocation grant is the stronger intent.
+Cleaner than a UI toggle: zero buttons, no persisted mode state, no
+chance for the toggle to drift from current intent.
 
-### List card → map fly-to (resolve click-sync asymmetry)
-**What:** Today the wrapper has one-way click sync: marker → list card scroll+flash. List card click does NOT fly the map to the park because the card is an `<a href="/park/<slug>">` (clicking navigates away). Resolution options: (a) add a small "Show on map" button per card that hits a wrapper-owned flyToPark callback, (b) wire hover sync (above) so map updates without click, (c) accept the asymmetry forever and document it.
-**Why:** The eng review spec'd bidirectional click sync; the implementation deferred because the navigation contract on list cards is load-bearing (users expect click → park profile). Phase 10 ships with option (c) by default; the asymmetry is documented inline in `SyncedMapList.tsx:46-52`.
-**Pros:** Option (a) is a clean ~M-effort feature: add a button to NearbyCard (opt-in via prop, off for /park/[slug] callers), wire a new prop on MapView for "fly to and open popup for park id," reuse the existing `markersByParkIdRef`. No new gestures, no touch-device pain.
-**Cons:** Option (a) clutters every card with a small button — visual noise for marginal value if hover sync ships first. Holding until D3.3 lands is the lazy call: if hover sync fixes the "I want to see this on the map" intent, option (a) becomes unnecessary.
-**Context:** Phase 10 (eng review 2026-06-22) — surfaced in the eng review's bidirectional click-sync spec, deferred during implementation because of the `<a href>` navigation conflict. Effort: M (button + prop wiring + tests + visual treatment).
-**Depends on:** Reconsider after D3.3 hover sync ships. If hover sync covers the use case, this becomes a "deliberately left undone" entry instead of a TODO.
+### ~~List card → map fly-to (resolve click-sync asymmetry)~~
+**SUPERSEDED 2026-06-22** by the hover-sync landing above. Hover/focus
+on a list card opens its marker's popup without leaving the page;
+clicking the card still navigates to `/park/<slug>` as before. The
+asymmetry (click navigates, hover previews) is now an intentional
+separation of intent rather than a gap. No per-card "show on map"
+button needed.
 
 ### Park photo lightbox / thumbnail expansion
 **What:** The horizontal photo strip on /park/<slug> (`src/components/park/PhotoStrip.tsx`) renders thumbnails but clicking one does nothing. Wire each thumbnail to open a modal/lightbox with the full-resolution version, keyboard-navigable (←/→ between photos, Esc to close), with caption + credit if present.

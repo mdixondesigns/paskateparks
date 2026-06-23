@@ -1,25 +1,21 @@
 "use client";
 
-// T3 — URL state for the synced map+list view.
+// URL state for the synced map+list view.
 //
-// Shape: ?lat=&lng=&zoom=&filtered=1
+// Shape: ?lat=&lng=&zoom=
 //   • lat/lng/zoom set the map's initial view on cold load
-//   • filtered=1 means "the sender had bbox-filtered the list" — auto-apply
-//     the bbox filter to the list on load (D12 — shareable URLs preserve the
-//     SENDER's list state, not just map view)
 //
 // Two-call contract:
-//   const { initialView, filteredFromUrl, writeViewport, setUserDriven }
-//     = useMapUrlState();
+//   const { initialView, writeViewport, setUserDriven } = useMapUrlState();
 //
-// On cold load: read URL once, expose initialView + filteredFromUrl.
-// On every user-driven moveend: caller invokes writeViewport(view, filtered).
+// On cold load: read URL once, expose initialView.
+// On every user-driven moveend: caller invokes writeViewport(view).
 // The hook debounces 300ms, suppresses writes when isUserDriven=false.
 //
 // The isUserDriven flag (codex moveend-cascade fix) lives here, not in
 // SyncedMapList, so the hook is the single source of truth for "should I
 // write the URL right now?" Programmatic setView/flyTo/fitBounds (URL
-// restore, "See all" reset, list-card click) set this false; user-initiated
+// restore, list-card focus, find-me grant) set this false; user-initiated
 // dragend/zoomend set it true.
 
 import { useRouter, useSearchParams } from "next/navigation";
@@ -48,11 +44,9 @@ export interface UseMapUrlStateResult {
   /** Initial view from URL params, or null if absent/invalid. Stable
    *  across renders — captured once on mount. */
   initialView: MapView | null;
-  /** `filtered=1` was present on cold load AND initialView was valid. */
-  filteredFromUrl: boolean;
   /** Caller invokes on user-driven moveend. Debounced 300ms.
    *  Skipped entirely when isUserDriven=false. */
-  writeViewport: (view: MapView, filtered: boolean) => void;
+  writeViewport: (view: MapView) => void;
   /** Programmatic moves (URL restore, fitBounds, flyTo) set false;
    *  user-initiated dragend/zoomend set true. */
   setUserDriven: (driven: boolean) => void;
@@ -60,17 +54,14 @@ export interface UseMapUrlStateResult {
 
 /**
  * Pure parser, exported for unit tests. Returns null when any param is
- * missing, NaN, or out-of-bounds. `filtered` is only honored when the
- * view is also valid (URL with `filtered=1` but no lat/lng is treated
- * as inconsistent — silently drop the filter flag).
+ * missing, NaN, or out-of-bounds.
  */
 export function parseMapUrlState(
   params: URLSearchParams | { get(key: string): string | null },
-): { view: MapView | null; filtered: boolean } {
+): { view: MapView | null } {
   const lat = parseFloat(params.get("lat") ?? "");
   const lng = parseFloat(params.get("lng") ?? "");
   const zoom = parseFloat(params.get("zoom") ?? "");
-  const filteredRaw = params.get("filtered");
 
   const viewValid =
     Number.isFinite(lat) &&
@@ -83,10 +74,7 @@ export function parseMapUrlState(
     zoom >= ZOOM_MIN &&
     zoom <= ZOOM_MAX;
 
-  return {
-    view: viewValid ? { lat, lng, zoom } : null,
-    filtered: viewValid && filteredRaw === "1",
-  };
+  return { view: viewValid ? { lat, lng, zoom } : null };
 }
 
 export function useMapUrlState(): UseMapUrlStateResult {
@@ -114,7 +102,7 @@ export function useMapUrlState(): UseMapUrlStateResult {
   }, []);
 
   const writeViewport = useCallback(
-    (view: MapView, filtered: boolean) => {
+    (view: MapView) => {
       if (!isUserDrivenRef.current) return;
 
       if (writeTimerRef.current) clearTimeout(writeTimerRef.current);
@@ -123,7 +111,6 @@ export function useMapUrlState(): UseMapUrlStateResult {
         params.set("lat", view.lat.toFixed(4));
         params.set("lng", view.lng.toFixed(4));
         params.set("zoom", String(Math.round(view.zoom)));
-        if (filtered) params.set("filtered", "1");
         router.replace(`?${params.toString()}`, { scroll: false });
       }, WRITE_DEBOUNCE_MS);
     },
@@ -133,7 +120,6 @@ export function useMapUrlState(): UseMapUrlStateResult {
   return useMemo(
     () => ({
       initialView: initial.view,
-      filteredFromUrl: initial.filtered,
       writeViewport,
       setUserDriven,
     }),

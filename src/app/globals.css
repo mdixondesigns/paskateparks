@@ -59,17 +59,21 @@ body[data-map-mounted="true"] .map-fallback-list {
   border-radius: 4px;
 }
 
-/* T6 — Brief highlight applied to a list card when the user clicks its
-   corresponding map marker. SyncedMapList adds .card-flash for 1500ms then
-   removes it. Subtle yellow background fade is the lazy "look here"
-   affordance — designer can refine in /design-review later. */
-@keyframes card-flash-fade {
-  0% { background-color: rgba(252, 211, 77, 0.5); }
-  100% { background-color: transparent; }
+/* Persistent highlight on a list card while its map marker's popup is open.
+   SyncedMapList adds .card-selected when popupopen fires for the matching
+   park id, removes it on popupclose. Subtle yellow background — designer can
+   refine in /design-review later. */
+.card-selected {
+  background-color: rgba(252, 211, 77, 0.5);
 }
-.card-flash {
-  animation: card-flash-fade 1500ms ease-out;
-}
-@media (prefers-reduced-motion: reduce) {
-  .card-flash { animation-duration: 0.01ms; }
+
+/* User location pin — blue dot rendered into Leaflet's divIcon. The marker
+   is added/removed by MapView when the userLocation prop changes. */
+.user-location-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 9999px;
+  background-color: #2563eb;
+  border: 2px solid #ffffff;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.4);
 }

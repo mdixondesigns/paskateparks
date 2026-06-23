@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { render } from "@testing-library/react";
 
 // Phase 7 plan-eng-review C12 — Vitest with mocked Leaflet is a smoke-level
 // check that the right calls fire in the right shape. Real Leaflet behavior
@@ -41,6 +41,7 @@ const { mapInstance, tileLayerInstance, clusterGroupInstance, createdMarkers, L 
   })) as unknown as AnyFn;
   const map = {
     addLayer: vi.fn<AnyFn>(),
+    removeLayer: vi.fn<AnyFn>(),
     setView: vi.fn<AnyFn>(),
     fitBounds: vi.fn<AnyFn>(),
     flyTo: vi.fn<AnyFn>(),
@@ -94,6 +95,8 @@ const { mapInstance, tileLayerInstance, clusterGroupInstance, createdMarkers, L 
     bindPopup: ReturnType<typeof vi.fn>;
     on: ReturnType<typeof vi.fn>;
     openPopup: ReturnType<typeof vi.fn>;
+    addTo: ReturnType<typeof vi.fn>;
+    setLatLng: ReturnType<typeof vi.fn>;
     __fire: (event: string, ...args: unknown[]) => void;
   }> = [];
   return {
@@ -115,12 +118,15 @@ const { mapInstance, tileLayerInstance, clusterGroupInstance, createdMarkers, L 
           bindPopup: vi.fn<AnyFn>(),
           on: vi.fn<AnyFn>(),
           openPopup: vi.fn<AnyFn>(),
+          addTo: vi.fn<AnyFn>(),
+          setLatLng: vi.fn<AnyFn>(),
           __fire: (event: string, ...args: unknown[]) => {
             const list = handlers.get(event) ?? [];
             for (const cb of list) cb(...args);
           },
         };
         m.bindPopup.mockImplementation((() => m) as unknown as AnyFn);
+        m.addTo.mockImplementation((() => m) as unknown as AnyFn);
         m.on.mockImplementation(((event: string, cb: (...args: unknown[]) => unknown) => {
           const list = handlers.get(event) ?? [];
           list.push(cb);
@@ -167,6 +173,7 @@ const PA_PARKS: MapPark[] = [
 beforeEach(() => {
   // Reset all mock call records but keep the mock implementations.
   mapInstance.addLayer.mockClear();
+  mapInstance.removeLayer.mockClear();
   mapInstance.setView.mockClear();
   mapInstance.fitBounds.mockClear();
   mapInstance.flyTo.mockClear();
@@ -196,11 +203,6 @@ beforeEach(() => {
   // Note: don't clear L.Icon.Default.mergeOptions — it's called once at module
   // load (the bundler-footgun fix lives at the top of MapView.tsx, not inside
   // useEffect). Clearing it here would erase the only call we want to assert.
-  // happy-dom doesn't ship geolocation. Stub so the Find-me button renders.
-  vi.stubGlobal("navigator", {
-    ...globalThis.navigator,
-    geolocation: { getCurrentPosition: vi.fn() },
-  });
 });
 
 afterEach(() => {
@@ -231,7 +233,7 @@ describe("MapView — Leaflet init flow", () => {
   it("creates one markerClusterGroup and adds one marker per park (CMT-1: D12)", () => {
     render(<MapView parks={PA_PARKS} />);
     expect(L.markerClusterGroup).toHaveBeenCalledTimes(1);
-    expect(L.markerClusterGroup).toHaveBeenCalledWith({ maxClusterRadius: 40 });
+    expect(L.markerClusterGroup).toHaveBeenCalledWith({ maxClusterRadius: 30 });
     expect(L.marker).toHaveBeenCalledTimes(PA_PARKS.length);
     expect(clusterGroupInstance.addLayer).toHaveBeenCalledTimes(PA_PARKS.length);
     // Marker coords match park lat/lng order.
@@ -363,7 +365,7 @@ describe("MapView — Leaflet init flow", () => {
       expect(eventsBound).not.toContain("zoomstart");
     });
 
-    it("fires onMoveEnd with bounds, lat/lng, and zoom when moveend fires", () => {
+    it("fires onMoveEnd with lat/lng/zoom when moveend fires", () => {
       const onMoveEnd = vi.fn();
       render(<MapView parks={PA_PARKS} onMoveEnd={onMoveEnd} />);
       mapInstance.__setView(
@@ -372,8 +374,9 @@ describe("MapView — Leaflet init flow", () => {
         11,
       );
       mapInstance.__fire("moveend");
+      // Bounds were dropped from the event shape (Plan A — sort by center,
+      // never bbox-filter — so the wrapper only needs lat/lng/zoom).
       expect(onMoveEnd).toHaveBeenCalledExactlyOnceWith({
-        bounds: { south: 39.9, west: -76.0, north: 40.1, east: -75.0 },
         lat: 40,
         lng: -75.5,
         zoom: 11,
@@ -445,31 +448,93 @@ describe("resolveAssetUrl — Turbopack/Webpack shape normalizer", () => {
   });
 });
 
-describe("MapView — Find-me button", () => {
-  it("renders the idle label when geolocation is supported", async () => {
-    render(<MapView parks={PA_PARKS} />);
-    expect(await screen.findByRole("button", { name: /find parks near me/i })).toBeInTheDocument();
+describe("MapView — userLocation prop (Plan A — lifted from MapView to SyncedMapList)", () => {
+  it("does not call flyTo or create a dot when userLocation is null", () => {
+    render(<MapView parks={PA_PARKS} userLocation={null} />);
+    expect(mapInstance.flyTo).not.toHaveBeenCalled();
+    // Only the park markers are created; no extra L.marker call for a dot.
+    expect(L.marker).toHaveBeenCalledTimes(PA_PARKS.length);
   });
 
-  it("renders no button when navigator.geolocation is undefined", () => {
-    vi.stubGlobal("navigator", { ...globalThis.navigator, geolocation: undefined });
-    render(<MapView parks={PA_PARKS} />);
-    expect(screen.queryByRole("button")).toBeNull();
+  it("flies to userLocation and creates a blue-dot marker on first non-null value", () => {
+    const { rerender } = render(<MapView parks={PA_PARKS} userLocation={null} />);
+    expect(L.marker).toHaveBeenCalledTimes(PA_PARKS.length);
+    rerender(<MapView parks={PA_PARKS} userLocation={{ lat: 40.45, lng: -79.99 }} />);
+    expect(mapInstance.flyTo).toHaveBeenCalledWith([40.45, -79.99], 11, { duration: 1.5 });
+    // One extra marker created — the blue dot.
+    expect(L.marker).toHaveBeenCalledTimes(PA_PARKS.length + 1);
+    // The dot's options carry the user-location-marker className via divIcon.
+    const lastDivIconCall = L.divIcon.mock.calls[L.divIcon.mock.calls.length - 1]?.[0] as
+      | { className: string; html: string }
+      | undefined;
+    expect(lastDivIconCall?.className).toBe("user-location-marker");
+    expect(lastDivIconCall?.html).toContain("user-location-dot");
   });
 
-  it("calls map.flyTo with user coords + zoom 11 after a successful fix", async () => {
-    type Success = (pos: { coords: { latitude: number; longitude: number } }) => void;
-    const getCurrentPosition = vi.fn((success: Success) => {
-      success({ coords: { latitude: 40.45, longitude: -79.99 } });
-    });
-    vi.stubGlobal("navigator", {
-      ...globalThis.navigator,
-      geolocation: { getCurrentPosition },
-    });
-    render(<MapView parks={PA_PARKS} />);
-    fireEvent.click(await screen.findByRole("button"));
-    await waitFor(() =>
-      expect(mapInstance.flyTo).toHaveBeenCalledWith([40.45, -79.99], 11, { duration: 1.5 }),
+  it("moves the existing dot (no new marker) on subsequent userLocation changes", () => {
+    const { rerender } = render(
+      <MapView parks={PA_PARKS} userLocation={{ lat: 40.45, lng: -79.99 }} />,
     );
+    const markerCountAfterFirst = L.marker.mock.calls.length;
+    rerender(<MapView parks={PA_PARKS} userLocation={{ lat: 39.95, lng: -75.16 }} />);
+    // No new marker created — setLatLng on the existing dot instead.
+    expect(L.marker.mock.calls.length).toBe(markerCountAfterFirst);
+    const dotMarker = createdMarkers[createdMarkers.length - 1];
+    expect(dotMarker?.setLatLng).toHaveBeenCalledWith([39.95, -75.16]);
+    // flyTo fires again for the new location.
+    expect(mapInstance.flyTo).toHaveBeenLastCalledWith([39.95, -75.16], 11, { duration: 1.5 });
+  });
+
+  it("removes the dot when userLocation transitions back to null", () => {
+    const { rerender } = render(
+      <MapView parks={PA_PARKS} userLocation={{ lat: 40.45, lng: -79.99 }} />,
+    );
+    const dotMarker = createdMarkers[createdMarkers.length - 1];
+    rerender(<MapView parks={PA_PARKS} userLocation={null} />);
+    expect(mapInstance.removeLayer).toHaveBeenCalledWith(dotMarker);
+  });
+});
+
+describe("MapView — popup events drive the persistent list highlight", () => {
+  it("binds popupopen + popupclose on every marker", () => {
+    render(<MapView parks={PA_PARKS} />);
+    for (const m of createdMarkers) {
+      const events = m.on.mock.calls.map((c) => c[0]);
+      expect(events).toContain("popupopen");
+      expect(events).toContain("popupclose");
+    }
+  });
+
+  it("fires onPopupOpen with the park id when popupopen fires on a marker", () => {
+    const onPopupOpen = vi.fn();
+    render(<MapView parks={PA_PARKS} onPopupOpen={onPopupOpen} />);
+    // Fire popupopen on the second marker (Bayne, id=2).
+    createdMarkers[1]!.__fire("popupopen");
+    expect(onPopupOpen).toHaveBeenCalledExactlyOnceWith(2);
+  });
+
+  it("fires onPopupClose with the park id when popupclose fires", () => {
+    const onPopupClose = vi.fn();
+    render(<MapView parks={PA_PARKS} onPopupClose={onPopupClose} />);
+    createdMarkers[0]!.__fire("popupclose");
+    expect(onPopupClose).toHaveBeenCalledExactlyOnceWith(1);
+  });
+});
+
+describe("MapView — hoveredParkId opens popup without zooming", () => {
+  it("calls marker.openPopup on the matching id (no zoomToShowLayer)", () => {
+    const { rerender } = render(<MapView parks={PA_PARKS} hoveredParkId={null} />);
+    expect(createdMarkers[1]?.openPopup).not.toHaveBeenCalled();
+    rerender(<MapView parks={PA_PARKS} hoveredParkId={2} />);
+    // Hover sync should NOT zoom — that would yank the map view on every
+    // hover (terrible UX). Only selectedParkId path zooms.
+    expect(clusterGroupInstance.zoomToShowLayer).not.toHaveBeenCalled();
+    expect(createdMarkers[1]?.openPopup).toHaveBeenCalledOnce();
+  });
+
+  it("non-existent hoveredParkId is a no-op (defensive)", () => {
+    render(<MapView parks={PA_PARKS} hoveredParkId={9999} />);
+    expect(clusterGroupInstance.zoomToShowLayer).not.toHaveBeenCalled();
+    for (const m of createdMarkers) expect(m.openPopup).not.toHaveBeenCalled();
   });
 });

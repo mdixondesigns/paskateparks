@@ -14,34 +14,39 @@ import { NearMeButton, type GeoErrorReason } from "./NearMeButton";
 //
 //   parks (alphabetical from RSC)  ─┐
 //   filter (free text)             ─┼─►  filtered = parks.filter(matchFilter)
-//   userLocation (or null)         ─┘
+//   userLocation | mapCenter | -   ─┘
 //                                       │
-//   filtered  ─┐                        │
-//   userLoc   ─┴──► sorted = userLoc                ┌─ alphabetical (default)
-//                              ? byDistance(filtered)
-//                              : filtered           └─ already alpha from server
+//   filtered                            │  Sort precedence:
+//   userLocation, mapCenter ────────────┴─►  userLocation → byDistance(filtered, userLocation)
+//                                            mapCenter    → byDistance(filtered, mapCenter)
+//                                            -            → alphabetical (already alpha from server)
 //
-// CMT-2 lock: when both filter AND geo are active, we sort WITHIN the filtered
-// set, not the global set. Preserves user search context across geo grant.
+// CMT-2 lock: when filter AND a sort origin are active, sort applies WITHIN
+// the filtered set, not the global set. Preserves user search context.
 //
-// P1-A: when sorted-by-distance kicks in we (1) scroll the list into view, and
-// (2) the polite aria-live region announces the change to screen readers.
+// Phase 10 — userLocation lifted to SyncedMapList so map flyTo + blue dot
+// + list sort share one source. mapCenter is fed from the map's moveend so
+// the list re-orders as the user pans, no bbox filtering, no "Search this
+// area" button. userLocation wins if both are set (user proximity is the
+// stronger intent).
 
 const ABOVE_FOLD_PRIORITY_COUNT = 3;
 
 interface Props {
   parks: HomeParkRow[];
-  /**
-   * T11 — synced map+list wrapper composes the bbox-filter status into
-   * HomeParkList's existing aria-live region instead of rendering its own.
-   * Two aria-live regions race each other and screen readers may drop one
-   * or both announcements. When set, this string is appended after the
-   * geolocation/filter status with a separating space, both rendered into
-   * the single role="status" region below.
-   *
-   * Park-profile callers and standalone uses leave this undefined.
-   */
-  bboxStatus?: string | null;
+  /** Lifted to the parent (SyncedMapList). When set, the list sorts by
+   *  distance from this point and shows distance pills. Wins over mapCenter. */
+  userLocation?: { lat: number; lng: number } | null;
+  /** Map center from the last moveend. When set (and userLocation is null),
+   *  the list sorts by distance from here. No pills — too noisy as the user
+   *  pans. Sort-only, never filter. */
+  mapCenter?: { lat: number; lng: number } | null;
+  /** Forwarded up to SyncedMapList so both the list sort AND the map's blue
+   *  dot react to the same NearMe button click. Optional — standalone uses
+   *  (none today, but kept for parity with NearMeButton's contract) fall
+   *  back to a noop. */
+  onLocation?: (lat: number, lng: number) => void;
+  onError?: (reason: GeoErrorReason) => void;
 }
 
 function matchesFilter(park: HomeParkRow, q: string): boolean {
@@ -74,11 +79,9 @@ function pluralize(n: number, noun: string): string {
   return `${n} ${n === 1 ? noun : `${noun}s`}`;
 }
 
-// Single shape converter so the three call sites (sorted, no-coords append,
-// alpha default) don't drift. Distance is omitted when undefined (D6 widening).
-// id is always passed so SyncedMapList can query the card by data-park-id for
-// the marker → list click sync. (Cards on /park/[slug] don't go through this
-// converter, so they correctly stay sync-inert with no data-park-id attr.)
+// Single shape converter so the call sites don't drift. Distance is omitted
+// when undefined (D6 widening; also when mapCenter sort is the origin —
+// distance from map center isn't useful info per-card).
 function toCardItem(
   p: HomeParkRow,
   extras: { distanceMiles?: number; priority?: boolean } = {},
@@ -95,56 +98,63 @@ function toCardItem(
   };
 }
 
-export function HomeParkList({ parks, bboxStatus }: Props) {
+export function HomeParkList({ parks, userLocation, mapCenter, onLocation, onError }: Props) {
   const [filter, setFilter] = useState("");
-  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [geoError, setGeoError] = useState<GeoErrorReason | null>(null);
   const listRef = useRef<HTMLOListElement>(null);
 
   function handleLocation(lat: number, lng: number) {
-    setUserLocation({ lat, lng });
     setGeoError(null);
+    onLocation?.(lat, lng);
   }
 
   function handleGeoError(reason: GeoErrorReason) {
     setGeoError(reason);
-    setUserLocation(null);
+    onError?.(reason);
   }
 
-  // P1-A: scroll the list into view once React has committed the re-sorted DOM.
-  // useEffect runs AFTER commit; a microtask scheduled inside handleLocation
-  // would have fired BEFORE the new list was laid out, scrolling to the stale
-  // position. Cleanup is a noop — the smooth-scroll completes on its own.
+  // P1-A: scroll the list into view once React has committed the re-sorted DOM
+  // after a fresh geolocation grant. Only fires on transitions to a non-null
+  // userLocation (the first grant); subsequent ref changes from the parent
+  // don't re-scroll.
+  const lastUserLocRef = useRef<{ lat: number; lng: number } | null>(null);
   useEffect(() => {
-    if (userLocation) {
+    if (
+      userLocation &&
+      (lastUserLocRef.current?.lat !== userLocation.lat ||
+        lastUserLocRef.current?.lng !== userLocation.lng)
+    ) {
+      lastUserLocRef.current = userLocation;
       listRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    } else if (!userLocation) {
+      lastUserLocRef.current = null;
     }
   }, [userLocation]);
 
-  // Filter + sort composition. Both pipelines are O(n) on 48 rows; no memoization
-  // gymnastics needed. useMemo only because it makes the dataflow explicit and
-  // avoids recomputing on unrelated re-renders.
+  // Filter + sort composition. Both pipelines are O(n) on 48 rows; no memo
+  // gymnastics needed. useMemo only because it makes the dataflow explicit
+  // and avoids recomputing on unrelated re-renders.
   const items = useMemo<NearbyCardItem[]>(() => {
     const filtered = parks.filter((p) => matchesFilter(p, filter));
 
-    if (userLocation) {
-      // findNearby drops parks with NULL lat/lng — phase 6 has none currently,
-      // but the helper handles it defensively (STACK-PIVOT.md finding #2).
-      // No distance cap: homepage shows global sort.
-      const sorted = findNearby(userLocation, filtered, {
+    // Sort origin precedence: userLocation > mapCenter > alphabetical.
+    const sortOrigin = userLocation ?? mapCenter ?? null;
+    if (sortOrigin) {
+      const sorted = findNearby(sortOrigin, filtered, {
         limit: filtered.length,
         maxMiles: Number.POSITIVE_INFINITY,
       });
-      // Parks without coords get appended after the sorted-by-distance set so
-      // they don't disappear entirely from a filtered search.
       const sortedIds = new Set(sorted.map((s) => s.id));
       const noCoords = filtered.filter((p) => !sortedIds.has(p.id));
-      // Compute priority across the UNION so the first 3 visible cards always
-      // get LCP priority regardless of which branch produced them (avoids the
-      // edge case where a tight filter yields <3 sorted items and the no-coord
-      // appendees occupy the above-the-fold slots without priority).
+      // Distance pills are only meaningful for the userLocation case
+      // ("how far am I from this park?"). mapCenter pan would change pills
+      // continuously — distracting. Suppress when the origin is mapCenter.
+      const showDistance = userLocation !== null && userLocation !== undefined;
       const union = [
-        ...sorted.map((p) => ({ park: p as HomeParkRow, distance: p.distanceMiles })),
+        ...sorted.map((p) => ({
+          park: p as HomeParkRow,
+          distance: showDistance ? p.distanceMiles : undefined,
+        })),
         ...noCoords.map((p) => ({ park: p, distance: undefined as number | undefined })),
       ];
       return union.map(({ park, distance }, idx) =>
@@ -159,19 +169,15 @@ export function HomeParkList({ parks, bboxStatus }: Props) {
     return filtered.map((p, idx) =>
       toCardItem(p, { priority: idx < ABOVE_FOLD_PRIORITY_COUNT }),
     );
-  }, [parks, filter, userLocation]);
+  }, [parks, filter, userLocation, mapCenter]);
 
   const countLabel = pluralize(items.length, "park");
-  const baseStatus: string =
-    userLocation !== null
+  const status: string =
+    userLocation
       ? `Showing ${countLabel} nearest to you${filter ? ` matching "${filter}"` : ""}.`
       : filter
         ? `Showing ${countLabel} matching "${filter}".`
         : "";
-  // T11: single aria-live region announces both the in-list filter/sort
-  // state AND the wrapper-owned bbox filter. Joined with a space when both
-  // are present; either alone renders cleanly.
-  const status: string = [baseStatus, bboxStatus ?? ""].filter(Boolean).join(" ");
 
   return (
     <section aria-labelledby="park-list-heading" className="px-4 py-4">
