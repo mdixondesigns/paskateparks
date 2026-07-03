@@ -1,5 +1,5 @@
 ---
-status: ACTIVE
+status: SHIPPED (2026-06-23, commits 2bd5c66..54e7b0c) — 3 P2 follow-ups deferred to TODOS.md (modal prev/next nav, focus-return-on-close, open/close animation)
 ---
 # CEO Plan: Park Detail Modal (Intercepting Routes)
 

@@ -1,5 +1,7 @@
 # paskateparks.com — Site Audit
 
+> **Archived 2026-07-03.** The WordPress → Next.js/Supabase migration this audit informed is complete and live. Kept as historical reference for the old URL structure, data model, and content inventory — not actionable anymore.
+
 **Audited:** 2026-05-30
 **Method:** Headless browser crawl of homepage, /parks/, /all-parks/, /map/, sitemap.xml, sample park profiles, sample builder and shop pages.
 **Purpose:** Document current URL structure, data model, and content inventory before the Next.js + Airtable rebuild — so nothing of value is lost.
@@ -84,7 +86,7 @@
 /park/grays-ferry-crescent-skatepark/
 /park/haverford-township-skatepark/
 ```
-Full list of 47 saved to [park-urls.txt](park-urls.txt).
+Full list of 47 was saved to `park-urls.txt`, deleted 2026-07-03 (superseded by the live routes and `src/lib/retired-urls.ts`).
 
 ### robots.txt
 ```
@@ -301,6 +303,5 @@ Name, Slug, City, County, Address, Lat, Lng, Material, Style, Lighting, Helmets,
 
 ## Artifacts
 
-- Screenshots: [audit-screenshots/](audit-screenshots/)
-- Full park URL list: [park-urls.txt](park-urls.txt)
+- Screenshots and the full park URL list captured during this audit were deleted 2026-07-03 (migration complete, no longer referenced anywhere).
 - WP sitemap index: https://paskateparks.com/wp-sitemap.xml

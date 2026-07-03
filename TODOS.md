@@ -8,9 +8,6 @@ Captured by /plan-eng-review on 2026-05-30. Items the eng review surfaced but ex
 
 ## P1 — should ship with v1 or shortly after
 
-### ~~Park description renders literal `<p>` tags (BUG)~~
-**LANDED 2026-06-15.** `src/components/park/Overview.tsx:30-33` now uses `dangerouslySetInnerHTML` with a wrapping div carrying `mt-2 space-y-3 text-base leading-relaxed` Tailwind utilities. The `space-y-3` selector works on innerHTML children, so no `@tailwindcss/typography` dep was needed. Safety documented inline: descriptions are owner-authored via Studio, RLS is deny-all-anon on parks, no untrusted-input path writes the field. Regression suite at `src/components/park/Overview.test.tsx` (5 tests, 346 total) covers: HTML renders as DOM elements, no literal `<p>` text appears, section hides on empty content, inline `<a>` anchors preserved.
-
 ### Global header with logo, site title, and nav
 **What:** No site-wide header exists. `src/app/layout.tsx` has a skip-link explicitly commented as "visible on focus so keyboard users can bypass any future nav" (A6) — so the absence is acknowledged in code, just never implemented. Build a header with the wordmark/logo, "Pennsylvania Skateparks" title, and links to /map and /about. Sticky-or-not is a taste call; per VISUAL-DESIGN.md the warm-cream surface should host it cleanly without a divider until scroll.
 **Why:** Users on /park/<slug>, /county/<X>, /obstacle/<Y>, or /map have no clear way to navigate to other top-level sections. Today the only navigation is footer links. Launch-blocking IA.
@@ -35,9 +32,6 @@ Captured by /plan-eng-review on 2026-05-30. Items the eng review surfaced but ex
 **Context:** D29 already supports `Caption` and `Credit` on the Photos child table — alt text fits in there or a new `AltText` field. Render template should prefer `AltText`, fall back to `Caption`, fall back to auto-gen.
 **Depends on:** D4 migration complete (need records to author against).
 
-### ~~410 page body~~
-**LANDED 2026-06-15** (phase 9). `src/proxy.ts` + `src/lib/retired-urls.ts` return a 410 with a simple HTML body for `/builder/*` and `/shop/*` ("This page is permanently gone. [Browse parks](/) or [open the map](/map/).") plus `X-Robots-Tag: noindex,nofollow`. Covered end-to-end by `e2e/middleware-410.spec.ts` (16 tests across the 8 retired-builder/shop slugs, bare /builder + /shop, unknown sub-slugs, header check, and non-interception of /park/<slug>, /county/<slug>, /obstacle/<slug>).
-
 ### iOS vs Android directions deep links
 **What:** Spec the UA-detection logic for "Get Directions" buttons. `geo:` URI doesn't work cleanly on iOS Safari — needs `maps://` or `https://maps.apple.com/?ll=`.
 **Why:** Parents on iPhones (large share of mobile traffic) get a broken or confusing experience without this.
@@ -45,7 +39,7 @@ Captured by /plan-eng-review on 2026-05-30. Items the eng review surfaced but ex
 **Cons:** Trivial — ~1 hour of code, 1 Playwright test per platform.
 **Context:** Test plan already lists this; just needs the implementation spec. Add to /park/<slug>/ page component.
 
-### /new-park/ form destination — SITE-AUDIT §9 #6
+### /new-park/ form destination — docs/archive/SITE-AUDIT.md §9 #6
 **What:** Find out where the existing /new-park/ submissions go (email? CRM? Airtable already?). Migrate the flow into the new Suggestions table (or a separate New Park Submissions table).
 **Why:** If you don't ask the owner, you silently break a content-acquisition channel that's been running for years.
 **Pros:** Preserves an existing inflow channel.
@@ -89,15 +83,6 @@ Captured by /plan-eng-review on 2026-05-30. Items the eng review surfaced but ex
 **Pros:** Closes the loop on the success criterion 'rank in Google within 90 days.'
 **Cons:** ~2 hrs of setup.
 **Context:** Tied to D16 analytics decision and D19 monitoring commitment.
-
-### ~~Map: thumbnail markers + popup photo, tighter cluster tolerance~~
-**LANDED 2026-06-18** (this session). `MapView.tsx` now renders a circular thumbnail divIcon for every park with a hero photo (`park_photos.sort_order=0`) and falls back to the default Leaflet pin for stubs without photos. `buildPopupNode` prepends the same hero photo to popups. `maxClusterRadius` lowered from the default 80px → 40px — at least 2× more pins visible on page-load zoom, Philly/Pittsburgh density still collapses. `getOpenParksForMap` extended with a batched hero-photo JOIN; `MapParkRow` gains `heroPhotoPath: string \| null`. ponytail note in `MapView.tsx` flags the 400w-jpg shortcut: if bandwidth bills jump, add 80w to WIDTHS arrays + re-run migration.
-
-### ~~Tile provider — migrate off OSM public tiles before launch~~
-**LANDED 2026-06-08** (session 5). Swapped `MapView.tsx` to CARTO Positron (`https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png`) + matching preconnect in `src/app/map/page.tsx`. Closed the OSM-policy risk AND the visual "too realistic / atlas-y" feel in one swap. No API key needed — CARTO's public basemap policy permits anonymous use up to ~75K mapviews/mo, which exceeds our P0 traffic expectation for launch. Attribution updated to credit both OSM contributors and CARTO. If we ever blow past the free tier, the same URL pattern keys via `?api_key=` (provisioned in the CARTO dashboard) — no architecture change.
-
-### ~~Phase 9 webhook revalidate — taxonomy fan-out + REPLICA IDENTITY FULL~~
-**LANDED 2026-06-15** (phase 9). `src/app/api/revalidate/route.ts` validates Bearer token + dispatches to `src/lib/revalidate-resolver.ts:resolvePaths` (extracted pure async function, 21 unit tests). Resolver also revalidates `/` and `/map/` on parks-table + photo changes (caught during T2 — spec missed it because phase 6/7 use `dynamic = "force-static"`). Migration `0004_replica_identity_full.sql` set REPLICA IDENTITY FULL on all 8 tables (not just parks + park_obstacles — serial-PK child tables don't expose `park_id` in old_record under DEFAULT, breaking DELETE fan-out). pg_class.relreplident = 'f' verified on all 8.
 
 ---
 
@@ -143,34 +128,6 @@ Captured by /plan-eng-review on 2026-05-30. Items the eng review surfaced but ex
 **Context:** Phase 10 D3.2 (eng review, 2026-06-22). Effort: L (probably 2-3 days — extract the wrapper, parameterize the data source, migrate 2 routes, write archive-flavored e2e). The current SyncedMapList does enough state lifting that the boundary is mostly clean; the real work is data-source parameterization and the archive intro-copy block above the synced shell.
 **Depends on:** `/` synced layout shipping (this task block).
 
-### ~~Hover sync — list card ↔ map marker (D3.3)~~
-**LANDED 2026-06-22** (Plan A follow-up). `SyncedMapList` now tracks
-`hoveredParkId` via delegated pointerover/focusin listeners on the list
-container, gated to hover-capable pointers (`@media (hover: hover)`) so
-touch devices don't fire popup-open on every tap. The MapView reads
-`hoveredParkId` as a prop and calls `marker.openPopup()` without zooming
-(zoom on hover would yank the viewport). Focus events keep the keyboard
-path working alongside mouse hover. Same registry the marker-click path
-uses — `markersByParkIdRef` — so no new lookup machinery. Popup stays
-open after hover-out by design: user dismisses by clicking elsewhere on
-the map, matching the click-pinned UX from #5.
-
-### ~~Distance-sort respects map center toggle (D3.5)~~
-**SUPERSEDED 2026-06-22** by Plan A: list sort precedence is now
-`userLocation > mapCenter > alphabetical` with no toggle. mapCenter
-updates silently on every moveend (programmatic or user). userLocation
-wins when both are set — geolocation grant is the stronger intent.
-Cleaner than a UI toggle: zero buttons, no persisted mode state, no
-chance for the toggle to drift from current intent.
-
-### ~~List card → map fly-to (resolve click-sync asymmetry)~~
-**SUPERSEDED 2026-06-22** by the hover-sync landing above. Hover/focus
-on a list card opens its marker's popup without leaving the page;
-clicking the card still navigates to `/park/<slug>` as before. The
-asymmetry (click navigates, hover previews) is now an intentional
-separation of intent rather than a gap. No per-card "show on map"
-button needed.
-
 ### Park photo lightbox / thumbnail expansion
 **What:** The horizontal photo strip on /park/<slug> (`src/components/park/PhotoStrip.tsx`) renders thumbnails but clicking one does nothing. Wire each thumbnail to open a modal/lightbox with the full-resolution version, keyboard-navigable (←/→ between photos, Esc to close), with caption + credit if present.
 **Why:** Without expansion, the thumbnails read as decoration rather than browseable content. Skateparks are a visual product — parents and skaters want to actually see the park before driving 40 minutes.
@@ -196,12 +153,6 @@ button needed.
 **Depends on:** Nothing — pure refactor.
 
 **Update 2026-06-15:** The recursive loop side-effect of this write pattern surfaced in production within 2 minutes of enabling the parks webhook — `/api/revalidate` writes `last_revalidated_at` → fires parks UPDATE webhook → re-enters resolver → writes `last_revalidated_at` → loop at ~1 req/sec. Fixed in `src/lib/revalidate-resolver.ts:onlyLastRevalidatedAtChanged` (short-circuit when only that column differs between old_record and record). The recursion is dead, but every legit revalidate still triggers one extra self-fire that the guard catches and discards. The 60-second-window mitigation above would eliminate that extra round-trip too; revised trigger to ship is "if Vercel /api/revalidate invocation count grows visibly larger than user-driven edits, indicating the loop-guard is firing too often."
-
-### ~~Schema-sync tool for dev↔prod Airtable bases~~
-**RETIRED by Supabase pivot (E3).** Drizzle migrations are git-committed SQL files applied identically to both dev and prod Supabase projects via `supabase db push`. No drift possible.
-
-### ~~/admin/lint orphan-county chip — surface parks whose county isn't in counties.ts~~
-**LANDED 2026-06-15** (phase 9). `src/lib/lint-checks.ts:getOrphanCounties` runs `SELECT DISTINCT county FROM parks` and surfaces unresolved counties through the same chip dashboard. Ships alongside three other chips (stale revalidate >30d, missing coordinates, no photos) per 4A — all 4 chips shipped in v1. `getAllLintChips()` uses Promise.allSettled-style result so one failing query can't fail the whole dashboard.
 
 ### Tighten assertCountiesInData to detect Studio case/whitespace drift
 **What:** `src/lib/counties.ts:assertCountiesInData` is whitespace + case tolerant (good for catching unknowns), but `src/lib/park-query.ts:getParksByCounty` does a case-sensitive `eq(parks.county, "Bucks")` lookup. If Studio data drifts to `"bucks"` or `"Bucks "`, the build assertion passes but the runtime query returns 0 rows → `/county/bucks` 404s with no signal. Extend the assertion to also throw on canonical-form mismatch (value present in map but not in exact case + trim form). Today's data is verified clean; this is a guard against future Studio edits.
@@ -299,6 +250,6 @@ button needed.
 
 - Park rating system (1-10 score) — explicitly parked in DESIGN.md Revisions "Deferred to future iterations"
 - Embeddable widget — confirmed deferred in DESIGN.md
-- Blog / Events content — out of scope per SITE-AUDIT §9 #5
+- Blog / Events content — out of scope per docs/archive/SITE-AUDIT.md §9 #5
 - Printable "first visit" card — DESIGN.md UI Direction noted as out of scope
 - Park rating, owner score, community reviews — DESIGN.md "Deferred to future iterations"
