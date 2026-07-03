@@ -32,13 +32,6 @@ Captured by /plan-eng-review on 2026-05-30. Items the eng review surfaced but ex
 **Context:** D29 already supports `Caption` and `Credit` on the Photos child table — alt text fits in there or a new `AltText` field. Render template should prefer `AltText`, fall back to `Caption`, fall back to auto-gen.
 **Depends on:** D4 migration complete (need records to author against).
 
-### iOS vs Android directions deep links
-**What:** Spec the UA-detection logic for "Get Directions" buttons. `geo:` URI doesn't work cleanly on iOS Safari — needs `maps://` or `https://maps.apple.com/?ll=`.
-**Why:** Parents on iPhones (large share of mobile traffic) get a broken or confusing experience without this.
-**Pros:** Reliable native-maps handoff for the P0 parent flow.
-**Cons:** Trivial — ~1 hour of code, 1 Playwright test per platform.
-**Context:** Test plan already lists this; just needs the implementation spec. Add to /park/<slug>/ page component.
-
 ### /new-park/ form destination — docs/archive/SITE-AUDIT.md §9 #6
 **What:** Find out where the existing /new-park/ submissions go (email? CRM? Airtable already?). Migrate the flow into the new Suggestions table (or a separate New Park Submissions table).
 **Why:** If you don't ask the owner, you silently break a content-acquisition channel that's been running for years.
