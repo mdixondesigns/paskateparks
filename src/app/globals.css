@@ -100,9 +100,14 @@ body[data-map-mounted="true"] .map-fallback-list {
 }
 
 /* Desktop polish — bound the inner scroll height to the modal height so the
-   16-section profile scrolls internally rather than blowing past the dialog. */
+   16-section profile scrolls internally rather than blowing past the dialog.
+   `margin: auto` restores native <dialog>[open]::modal centering: Tailwind
+   Preflight's `*, ::backdrop { margin: 0 }` reset (preflight.css) wins over
+   the browser's UA centering rule, which otherwise pins the dialog to the
+   top-left of the viewport instead of the middle. */
 @media (min-width: 1024px) {
   .park-modal {
+    margin: auto;
     max-height: 90dvh;
   }
   .park-modal .park-modal__content {
@@ -110,3 +115,12 @@ body[data-map-mounted="true"] .map-fallback-list {
     overflow-y: auto;
   }
 }
+
+/* Park modal open — the global sitewide Footer (RootLayout renders it after
+   the @modal slot) is otherwise still in the DOM and visible behind the
+   dialog's ::backdrop dim. ModalShell sets this attribute on <body> for the
+   lifetime of the modal (mirrors the data-map-mounted pattern above). */
+body[data-park-modal-open="true"] > footer {
+  display: none;
+}
+

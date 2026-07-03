@@ -7,9 +7,10 @@ import { expect, test } from "@playwright/test";
 // in playwright.config.ts.
 //
 // Plan A: no bbox filter, no "Search this area" — the list re-orders by
-// map center as the user pans. Marker click → list card scrolls into view
-// and gets a persistent .card-selected highlight that stays until the
-// popup is dismissed.
+// map center as the user pans. Marker click → matching list card gets a
+// persistent .card-selected highlight that stays until the popup is
+// dismissed (no auto-scroll — removed per user request so the list doesn't
+// jump when a marker is clicked).
 
 const DESKTOP_BREAKPOINT_PX = 1024;
 
@@ -107,7 +108,7 @@ test.describe("Phase 10 — synced map+list on /", () => {
     await expect(page).toHaveURL((url) => url.pathname === "/");
   });
 
-  test("clicking a marker scrolls + highlights the matching list card persistently", async ({
+  test("clicking a marker highlights the matching list card persistently", async ({
     page,
     viewport,
   }) => {

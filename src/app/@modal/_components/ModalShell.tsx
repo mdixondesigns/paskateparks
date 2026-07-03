@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 
 // ModalShell — client wrapper for the native <dialog> lifecycle used by the
 // park-detail intercept route. Owns:
@@ -30,6 +30,18 @@ interface Props {
 export function ModalShell({ parkName, notFound = false, children }: Props) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const router = useRouter();
+
+  // Signal to Footer (rendered after the @modal slot in RootLayout, so it
+  // sits underneath the dialog's ::backdrop dim rather than being covered by
+  // it) that the modal is open, via a body data-attribute — same pattern as
+  // MapView's data-map-mounted. useLayoutEffect so the attribute lands before
+  // paint; a plain useEffect would let the footer flash visible for a frame.
+  useLayoutEffect(() => {
+    document.body.dataset.parkModalOpen = "true";
+    return () => {
+      delete document.body.dataset.parkModalOpen;
+    };
+  }, []);
 
   useEffect(() => {
     const dlg = dialogRef.current;

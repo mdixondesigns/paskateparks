@@ -27,9 +27,9 @@
 // highlights the card. While the modal is open the background list/map is
 // `inert` (per <dialog>.showModal() — D6.1), so hover popups can't fire.
 // List → map sync still drives via hover/focus (openPopup, no zoom).
-// Marker → card sync via popupopen scrolls the card into view (in
-// handleMarkerClick) and adds .card-selected; popupclose removes it
-// unless the modal route is open.
+// Marker → card sync via popupopen adds .card-selected (no scroll — removed
+// per user request, the list no longer jumps when a marker is clicked);
+// popupclose removes it unless the modal route is open.
 
 import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
@@ -160,8 +160,6 @@ export function SyncedMapList({ parks }: Props) {
   const selectedId = modalParkId ?? popupOpenForId;
 
   // selectedId effect — toggle .card-selected on the matching list card.
-  // Scroll-into-view is intentionally NOT here; it lives in handleMarkerClick
-  // so the trigger is unambiguous (marker click only, never hover/focus).
   useEffect(() => {
     if (flashedElRef.current) {
       flashedElRef.current.classList.remove("card-selected");
@@ -268,16 +266,6 @@ export function SyncedMapList({ parks }: Props) {
     [beginProgrammaticMoveWindow],
   );
 
-  const handleMarkerClick = useCallback((id: number) => {
-    // Scroll directly — no state, no effect, no timing race. The marker
-    // click is the unambiguous signal that the user wants to find this
-    // park's card in the list. Hover/focus paths never call this.
-    const root = listContainerRef.current;
-    if (!root) return;
-    const el = root.querySelector<HTMLElement>(`[data-park-id="${id}"]`);
-    if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
-  }, []);
-
   const handlePopupOpen = useCallback((id: number) => {
     setPopupOpenForId(id);
   }, []);
@@ -331,7 +319,6 @@ export function SyncedMapList({ parks }: Props) {
             userLocation={userLocation}
             hoveredParkId={hoveredParkId}
             onMoveEnd={handleMoveEnd}
-            onMarkerClick={handleMarkerClick}
             onPopupOpen={handlePopupOpen}
             onPopupClose={handlePopupClose}
           />

@@ -144,8 +144,6 @@ export interface MapViewProps {
   /** Fires after every map move/zoom settles. The wrapper drives mapCenter
    *  sort + the debounced URL write from this. */
   onMoveEnd?: (event: MapMoveEnd) => void;
-  /** Fires when the user clicks a park marker. */
-  onMarkerClick?: (parkId: number) => void;
   /** Fires when a marker's popup opens — wrapper uses this for the persistent
    *  .card-selected highlight on the matching list card. */
   onPopupOpen?: (parkId: number) => void;
@@ -160,7 +158,6 @@ export function MapView({
   hoveredParkId,
   userLocation,
   onMoveEnd,
-  onMarkerClick,
   onPopupOpen,
   onPopupClose,
 }: MapViewProps) {
@@ -180,7 +177,6 @@ export function MapView({
   // callbacks without re-running. Standard pattern for "init once, callback
   // can change between renders" in React.
   const onMoveEndRef = useRef<MapViewProps["onMoveEnd"]>(onMoveEnd);
-  const onMarkerClickRef = useRef<MapViewProps["onMarkerClick"]>(onMarkerClick);
   const onPopupOpenRef = useRef<MapViewProps["onPopupOpen"]>(onPopupOpen);
   const onPopupCloseRef = useRef<MapViewProps["onPopupClose"]>(onPopupClose);
   // D6.2 — router-aware popup link: the popup's "View profile" <a> intercepts
@@ -195,9 +191,6 @@ export function MapView({
   useEffect(() => {
     onMoveEndRef.current = onMoveEnd;
   }, [onMoveEnd]);
-  useEffect(() => {
-    onMarkerClickRef.current = onMarkerClick;
-  }, [onMarkerClick]);
   useEffect(() => {
     onPopupOpenRef.current = onPopupOpen;
   }, [onPopupOpen]);
@@ -267,7 +260,6 @@ export function MapView({
           }),
         { autoPan: false },
       );
-      marker.on("click", () => onMarkerClickRef.current?.(park.id));
       marker.on("popupopen", () => onPopupOpenRef.current?.(park.id));
       marker.on("popupclose", () => onPopupCloseRef.current?.(park.id));
       marker.addTo(map);

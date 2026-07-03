@@ -331,7 +331,7 @@ describe("MapView — Leaflet init flow", () => {
   });
 
   // T5 — new prop surface for the synced-layout wrapper.
-  describe("T5: synced-layout props (selectedParkId, onMoveEnd, onMarkerClick, initialView)", () => {
+  describe("T5: synced-layout props (selectedParkId, onMoveEnd, initialView)", () => {
     it("uses initialView (lat/lng/zoom) instead of fitBounds when provided", () => {
       render(<MapView parks={PA_PARKS} initialView={{ lat: 40.5, lng: -77.5, zoom: 9 }} />);
       expect(mapInstance.setView).toHaveBeenCalledWith([40.5, -77.5], 9, { animate: false });
@@ -370,20 +370,6 @@ describe("MapView — Leaflet init flow", () => {
         lng: -75.5,
         zoom: 11,
       });
-    });
-
-    it("binds click on every marker and fires onMarkerClick with the park id", () => {
-      const onMarkerClick = vi.fn();
-      render(<MapView parks={PA_PARKS} onMarkerClick={onMarkerClick} />);
-      // Each created marker should have a 'click' handler.
-      expect(createdMarkers).toHaveLength(PA_PARKS.length);
-      for (const m of createdMarkers) {
-        const eventsBound = m.on.mock.calls.map((c) => c[0]);
-        expect(eventsBound).toContain("click");
-      }
-      // Fire the click on the second marker (Bayne, id=2) — onMarkerClick(2).
-      createdMarkers[1]!.__fire("click");
-      expect(onMarkerClick).toHaveBeenCalledExactlyOnceWith(2);
     });
 
     it("selectedParkId effect calls marker.openPopup on the matching marker", () => {
