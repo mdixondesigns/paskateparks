@@ -80,7 +80,7 @@ export const richPark = buildPark({
       type: "bathroom",
       present: true,
       notes: "Portable toilets near the entrance",
-      photoPath: null,
+      photoPath: SAMPLE_PHOTO_PATH,
     },
     { parkId: 1, type: "drinking_water", present: false, notes: null, photoPath: null },
     { parkId: 1, type: "lights", present: true, notes: null, photoPath: null },

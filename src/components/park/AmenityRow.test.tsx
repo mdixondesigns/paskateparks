@@ -18,19 +18,26 @@ function amenity(partial: Partial<Amenity>): Amenity {
 }
 
 describe("AmenityRow — D18 universal Y/N + Notes + Photo", () => {
-  it("renders the present state with ✓", () => {
+  it("renders the present state with an Available status icon", () => {
     render(<AmenityRow amenity={amenity({ type: "parking", present: true })} />);
     expect(screen.getByText(/Parking/)).toBeInTheDocument();
-    expect(screen.getByLabelText(/Parking: Available/i)).toHaveTextContent("✓ Yes");
+    expect(screen.getByLabelText(/Parking: Available/i)).toBeInTheDocument();
   });
 
-  it("renders the absent state with — (em dash)", () => {
+  it("renders the absent state with a Not available status icon", () => {
     render(<AmenityRow amenity={amenity({ type: "lights", present: false })} />);
-    expect(screen.getByLabelText(/Lights: Not available/i)).toHaveTextContent("—");
+    expect(screen.getByLabelText(/Lights: Not available/i)).toBeInTheDocument();
   });
 
-  it("shows notes when present (even on a not-available amenity — edge case from TEST-PLAN.md)", () => {
-    render(
+  it("renders as a plain row (no <details>) when there are no notes and no photo", () => {
+    const { container } = render(
+      <AmenityRow amenity={amenity({ type: "lights", present: false })} />,
+    );
+    expect(container.querySelector("details")).not.toBeInTheDocument();
+  });
+
+  it("renders as a <details> accordion, collapsed by default, when notes are present", () => {
+    const { container } = render(
       <AmenityRow
         amenity={amenity({
           type: "onsite_shop",
@@ -39,12 +46,15 @@ describe("AmenityRow — D18 universal Y/N + Notes + Photo", () => {
         })}
       />,
     );
-    expect(
-      screen.getByText(/No onsite shop, but Plank Eye is 0.3mi away/i),
-    ).toBeInTheDocument();
+    const details = container.querySelector("details");
+    expect(details).toBeInTheDocument();
+    expect(details).not.toHaveAttribute("open");
+    // Notes are in the DOM even collapsed — <details> hides content via the
+    // browser's native collapse, not by unmounting it.
+    expect(screen.getByText(/No onsite shop, but Plank Eye is 0.3mi away/i)).toBeInTheDocument();
   });
 
-  it("hides the notes block when notes is null", () => {
+  it("does not render a notes paragraph when notes is null", () => {
     render(<AmenityRow amenity={amenity({ type: "drinking_water", present: false })} />);
     expect(screen.queryByText(/italic/i)).not.toBeInTheDocument();
   });

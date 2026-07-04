@@ -21,13 +21,11 @@ const ORDER = [
 export function AmenitiesGrid({ amenities }: Props) {
   if (amenities.length === 0) return null;
 
-  const sorted = [...amenities].sort(
-    (a, b) => ORDER.indexOf(a.type) - ORDER.indexOf(b.type),
-  );
+  const sorted = [...amenities].sort((a, b) => ORDER.indexOf(a.type) - ORDER.indexOf(b.type));
 
   return (
     <section aria-labelledby="amenities-heading" className="px-4 py-4">
-      <h2 id="amenities-heading" className="text-xs font-bold uppercase tracking-wider">
+      <h2 id="amenities-heading" className="text-xs font-bold tracking-wider uppercase">
         Amenities
       </h2>
       <ul role="list" className="mt-2">
