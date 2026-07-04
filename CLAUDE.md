@@ -56,3 +56,14 @@ the data + hosting layer (Supabase + Drizzle + Vercel + Sharp).
 
 In QA mode (/qa, /design-review), flag any code that doesn't match
 [VISUAL-DESIGN.md](VISUAL-DESIGN.md).
+
+## Storybook
+
+`pnpm storybook` (port 6006) isolates components for visual tuning against
+VISUAL-DESIGN.md without needing the full app/database running. Stories live
+next to their component as `<Component>.stories.tsx`; shared park fixtures
+(`richPark`, `stubPark`, `closedPark`, `buildPark(overrides)`) are in
+[src/lib/park-fixtures.ts](src/lib/park-fixtures.ts). Most `park/*` section
+components are covered; `ParkProfile.stories.tsx` renders the full 16-section
+composition. The a11y addon panel checks each story against WCAG per
+VISUAL-DESIGN.md §17 as you go.
