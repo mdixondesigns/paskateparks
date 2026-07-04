@@ -23,7 +23,7 @@ export function HeroBlock({ park }: Props) {
           sizes="(max-width: 768px) 100vw, 720px"
           loading="eager"
           fetchPriority="high"
-          className="mb-4 block w-full"
+          className="mb-4 block aspect-[375/420] w-full object-cover"
         />
       ) : null}
       <p className="text-sm uppercase tracking-wider">

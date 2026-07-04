@@ -292,10 +292,10 @@ export function SyncedMapList({ parks }: Props) {
   }, []);
 
   return (
-    <div className="lg:grid lg:grid-cols-[2fr_3fr] lg:gap-0">
+    <div className="lg:grid lg:h-full lg:grid-cols-[2fr_3fr] lg:gap-0">
       <div
         ref={listContainerRef}
-        className={`lg:max-h-[100dvh] lg:overflow-y-auto ${mobileMapOpen ? "hidden lg:block" : ""}`}
+        className={`lg:max-h-full lg:overflow-y-auto ${mobileMapOpen ? "hidden lg:block" : ""}`}
       >
         <HomeParkList
           parks={parks}
@@ -308,8 +308,8 @@ export function SyncedMapList({ parks }: Props) {
       <div
         className={
           mobileMapOpen
-            ? "fixed inset-0 z-[2000] lg:relative lg:inset-auto lg:z-auto lg:sticky lg:top-0 lg:h-[100dvh]"
-            : "relative hidden lg:block lg:sticky lg:top-0 lg:h-[100dvh]"
+            ? "fixed inset-0 z-[2000] lg:relative lg:inset-auto lg:z-auto lg:sticky lg:top-0 lg:h-full"
+            : "relative hidden lg:block lg:sticky lg:top-0 lg:h-full"
         }
       >
         {shouldMountMap ? (

@@ -19,7 +19,7 @@ export default async function Home() {
   // directly below the nav bar. Branding lives in SiteHeader; SEO h1 is
   // covered by the per-park profile pages.
   return (
-    <main id="main">
+    <main id="main" className="min-h-0 flex-1">
       <SyncedMapList parks={parks} />
     </main>
   );

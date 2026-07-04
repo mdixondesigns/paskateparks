@@ -382,7 +382,7 @@ export function MapView({
   }, [hoveredParkId]);
 
   return (
-    <div className="relative h-screen w-full">
+    <div className="relative h-full w-full">
       <div
         ref={containerRef}
         // Leaflet needs a positioned container with a real height.

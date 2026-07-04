@@ -26,7 +26,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body>
+      <body className="flex h-dvh flex-col">
         {/* Skip-link per A6 — visible on focus so keyboard users can bypass any future nav. */}
         <a
           href="#main"

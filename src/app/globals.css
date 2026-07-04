@@ -78,6 +78,17 @@ body[data-map-mounted="true"] .map-fallback-list {
   box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.4);
 }
 
+/* Native <dialog> defaults to `overflow: auto`, making the dialog itself a
+   second independent scroll container stacked around .park-modal__content
+   (which also scrolls). Wheel input would drain the inner scroll first, then
+   fall through to the dialog's own scrollbox — revealing blank space past
+   the real content and a cutoff-looking jump on scroll-back-up. The dialog
+   should only ever clip at its max-height; .park-modal__content is the sole
+   scroll container. */
+.park-modal {
+  overflow: hidden;
+}
+
 /* Park-detail intercept modal — desktop default is centered max-w-2xl (from
    the ModalShell className). Mobile (< lg breakpoint, 1024px) goes full
    viewport so the modal "looks like a new page": no border-radius, fills
