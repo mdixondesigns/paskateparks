@@ -67,6 +67,17 @@ body[data-map-mounted="true"] .map-fallback-list {
   background-color: rgba(252, 211, 77, 0.5);
 }
 
+/* Soft transition on the park list when the bbox filter narrows/widens it
+   (restored 2026-07-06). SyncedMapList toggles this class only when the
+   visible-park-ID set actually changes (not on every moveend) — a pan that
+   doesn't change what's shown does not trigger it. Respects
+   prefers-reduced-motion via the global override above. Designer can
+   refine in /design-review later. */
+.list-refreshing {
+  opacity: 0.4;
+  transition: opacity 150ms ease-out;
+}
+
 /* User location pin — blue dot rendered into Leaflet's divIcon. The marker
    is added/removed by MapView when the userLocation prop changes. */
 .user-location-dot {

@@ -12,6 +12,16 @@
 //   ┌─ State (lifted from HomeParkList + MapView) ────────────────────────┐
 //   │  userLocation     ← single source for both panes (blue dot + sort)  │
 //   │  mapCenter        ← list sorts by distance from map center on pan   │
+//   │  mapBounds        ← restored 2026-07-06. MapView.onMoveEnd.bounds;  │
+//   │                     null until the map has mounted+fired its first  │
+//   │                     moveend (mobile: null until "Map" tapped once). │
+//   │  visibleParks     ← mapBounds===null ? coordParks :                 │
+//   │                     filterByBbox(coordParks, mapBounds). No-coords  │
+//   │                     parks are EXCLUDED (matches the map's own       │
+//   │                     hasCoords behavior) — only 1 park in the live   │
+//   │                     DB lacks coords (see TODOS.md).                 │
+//   │  fitAllRequestId  ← incremented by "See all parks"; MapView watches │
+//   │                     it to re-run the fit-to-all-parks view.         │
 //   │  popupOpenForId   ← popup-driven highlight target (hover/click)     │
 //   │  modalParkId      ← URL-driven highlight target — derived from      │
 //   │                     usePathname() matching /park/<slug>. While the  │
@@ -35,6 +45,7 @@ import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { filterByBbox, type LatLngBoundsLike } from "@/lib/bbox-filter";
 import { hasCoords } from "@/lib/has-coords";
 import type { HomeParkRow, MapParkRow } from "@/lib/park-query";
 import { useMapUrlState } from "@/lib/use-map-url-state";
@@ -60,6 +71,17 @@ const MapView = dynamic(() => import("@/components/map/MapView").then((m) => m.M
   loading: () => null,
 });
 
+// Shared by the bbox-empty override and the persistent partial-filter chip
+// (D4.1, restored 2026-07-06) — same label/handler, only the className varies
+// by context.
+function SeeAllParksButton({ onClick, className }: { onClick: () => void; className: string }) {
+  return (
+    <button type="button" onClick={onClick} className={className}>
+      See all parks
+    </button>
+  );
+}
+
 interface Props {
   parks: HomeParkRow[];
 }
@@ -68,6 +90,16 @@ export function SyncedMapList({ parks }: Props) {
   const pathname = usePathname();
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number } | null>(null);
+  // mapBounds — restored 2026-07-06. null until the map has fired its first
+  // moveend (on mobile, that's null until "Map" is tapped at least once —
+  // D10: the null case is handled by the caller below, filterByBbox is
+  // never called with it).
+  const [mapBounds, setMapBounds] = useState<LatLngBoundsLike | null>(null);
+  // fitAllRequestId — "See all parks" reset. MapView watches this prop and
+  // re-runs its fit-to-all-parks view when it changes; the effect there
+  // guards against the initial 0 value so mounting doesn't spuriously re-fit.
+  const [fitAllRequestId, setFitAllRequestId] = useState(0);
+  const [isListRefreshing, setIsListRefreshing] = useState(false);
   // popupOpenForId: which park's marker has its popup currently displayed.
   // Set by Leaflet's popupopen event, cleared by popupclose. One of the two
   // inputs to selectedId; the other is modalParkId (derived from pathname).
@@ -122,23 +154,37 @@ export function SyncedMapList({ parks }: Props) {
     };
   }, []);
 
+  // coordParks/visibleParks — restored 2026-07-06 (automatic bbox filter).
+  // D7 (revised after ground-truth check against pnpm db:check-coords):
+  // no-coordinate parks are EXCLUDED from the synced list, matching the
+  // map's own hasCoords behavior — only 1 park in the live DB lacks
+  // coordinates, so a dual-source search-fallback architecture would be
+  // disproportionate. D10: filterByBbox is a pure function that requires a
+  // real bounds object; when mapBounds is null (mobile pre-tap), skip it
+  // entirely rather than modifying filterByBbox's contract.
+  const coordParks = useMemo(() => parks.filter(hasCoords), [parks]);
+
   // E1 — derive map-eligible parks client-side from the single
-  // getAllParksForHomepage query.
+  // getAllParksForHomepage query. Maps over coordParks (not a second
+  // parks.filter(hasCoords) pass) — same source, one filter pass shared.
   const mapParks: MapParkRow[] = useMemo(
     () =>
-      parks
-        .filter(hasCoords)
-        .map((p) => ({
-          id: p.id,
-          slug: p.slug,
-          name: p.name,
-          city: p.city,
-          state: p.state,
-          lat: p.lat,
-          lng: p.lng,
-          heroPhotoPath: p.heroPhotoPath,
-        })),
-    [parks],
+      coordParks.map((p) => ({
+        id: p.id,
+        slug: p.slug,
+        name: p.name,
+        city: p.city,
+        state: p.state,
+        lat: p.lat,
+        lng: p.lng,
+        heroPhotoPath: p.heroPhotoPath,
+      })),
+    [coordParks],
+  );
+
+  const visibleParks: HomeParkRow[] = useMemo(
+    () => (mapBounds === null ? coordParks : filterByBbox(coordParks, mapBounds)),
+    [coordParks, mapBounds],
   );
 
   // modalParkId — derived from the URL pathname. When the park-detail
@@ -242,6 +288,13 @@ export function SyncedMapList({ parks }: Props) {
   const handleMoveEnd = useCallback(
     (event: MapMoveEnd) => {
       const isProgrammatic = expectingProgrammaticMoveRef.current;
+      // mapBounds updates on EVERY moveend, programmatic or user-driven —
+      // restored 2026-07-06, placed identically to mapCenter (BEFORE the
+      // isProgrammatic branch diverges) so the bbox filter always reflects
+      // wherever the map currently is, matching the existing mapCenter-sort
+      // precedent. Only the URL write is gated on isProgrammatic, never the
+      // filter itself.
+      setMapBounds(event.bounds);
       if (isProgrammatic) {
         // Programmatic moves still update mapCenter so the list reflects
         // where the map landed after find-me flyTo or initial fitBounds —
@@ -280,6 +333,46 @@ export function SyncedMapList({ parks }: Props) {
     if (hoveredParkIdRef.current === id) setHoveredParkId(null);
   }, []);
 
+  // "See all parks" (D4.1/D6/D12/D13, restored 2026-07-06). Suppresses the
+  // resulting moveend's URL write (matches every other synthetic map move
+  // in this file) before triggering MapView's fit-to-all-parks re-run, then
+  // moves focus to the list heading — #park-list-heading is always present
+  // in the DOM (HomeParkList never unmounts, D5), so no need to wait for a
+  // render before focusing it.
+  const handleSeeAll = useCallback(() => {
+    beginProgrammaticMoveWindow();
+    setFitAllRequestId((n) => n + 1);
+    document.getElementById("park-list-heading")?.focus();
+  }, [beginProgrammaticMoveWindow]);
+
+  // .list-refreshing transition trigger (Finding 2A, restored 2026-07-06).
+  // Keyed on whether the VISIBLE-PARK-ID SET actually changed, not on raw
+  // mapBounds object identity — every moveend produces a new bounds object
+  // even when the resulting park set is unchanged (e.g. panning within a
+  // dense city). Skips the first computation so mounting doesn't flash.
+  const isFirstVisibleIdsRef = useRef(true);
+  const prevVisibleIdsRef = useRef("");
+  const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    const ids = visibleParks
+      .map((p) => p.id)
+      .sort((a, b) => a - b)
+      .join(",");
+    if (isFirstVisibleIdsRef.current) {
+      isFirstVisibleIdsRef.current = false;
+      prevVisibleIdsRef.current = ids;
+      return;
+    }
+    if (ids === prevVisibleIdsRef.current) return;
+    prevVisibleIdsRef.current = ids;
+    setIsListRefreshing(true);
+    if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+    refreshTimerRef.current = setTimeout(() => setIsListRefreshing(false), 200);
+    return () => {
+      if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+    };
+  }, [visibleParks]);
+
   const shouldMountMap = isDesktop || mobileMapEverOpened;
 
   const handleOpenMobileMap = useCallback(() => {
@@ -291,17 +384,42 @@ export function SyncedMapList({ parks }: Props) {
     setMobileMapOpen(false);
   }, []);
 
+  // Bbox-empty override (D5/D9, restored 2026-07-06) — only when there ARE
+  // parks overall but none fall within the current viewport (Section 2's
+  // gate: gated on the ORIGINAL parks.length, not coordParks, so a
+  // genuinely-empty database still falls through to HomeParkList's own
+  // untouched DB-empty branch).
+  const emptyOverride =
+    parks.length > 0 && visibleParks.length === 0 ? (
+      <div className="mt-4 text-sm">
+        <p>No skateparks in this area. Pan or zoom out to see more.</p>
+        <SeeAllParksButton onClick={handleSeeAll} className="mt-2 underline" />
+      </div>
+    ) : undefined;
+
+  // Only show the persistent chip when PARTIALLY filtered — the bbox-empty
+  // override above already renders its own "See all parks" action, so
+  // showing both at once would duplicate the affordance.
+  const showSeeAllChip =
+    visibleParks.length > 0 && visibleParks.length < coordParks.length;
+
   return (
     <div className="lg:grid lg:h-full lg:grid-cols-[2fr_3fr] lg:gap-0">
       <div
         ref={listContainerRef}
-        className={`lg:max-h-full lg:overflow-y-auto ${mobileMapOpen ? "hidden lg:block" : ""}`}
+        className={`lg:max-h-full lg:overflow-y-auto ${mobileMapOpen ? "hidden lg:block" : ""} ${
+          isListRefreshing ? "list-refreshing" : ""
+        }`}
       >
+        {showSeeAllChip ? (
+          <SeeAllParksButton onClick={handleSeeAll} className="mx-4 mt-2 text-xs underline" />
+        ) : null}
         <HomeParkList
-          parks={parks}
+          parks={visibleParks}
           userLocation={userLocation}
           mapCenter={mapCenter}
           onLocation={handleLocation}
+          emptyStateOverride={emptyOverride}
         />
         <HomeFooter />
       </div>
@@ -321,6 +439,7 @@ export function SyncedMapList({ parks }: Props) {
             onMoveEnd={handleMoveEnd}
             onPopupOpen={handlePopupOpen}
             onPopupClose={handlePopupClose}
+            fitAllRequestId={fitAllRequestId}
           />
         ) : null}
         {mobileMapOpen ? (
