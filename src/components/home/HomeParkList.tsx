@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { NearbyCard, type NearbyCardItem } from "@/components/park/NearbyCard";
@@ -47,6 +48,15 @@ interface Props {
    *  back to a noop. */
   onLocation?: (lat: number, lng: number) => void;
   onError?: (reason: GeoErrorReason) => void;
+  /** Restored 2026-07-06 — when the wrapper's bbox filter yields zero
+   *  coordinate-having parks in view (but `parks` itself is non-empty),
+   *  it passes this override to render bbox-specific empty copy + a "See
+   *  all parks" action, instead of HomeParkList's own two default empty
+   *  branches (DB-empty / text-filter-empty). Rendered only when supplied
+   *  AND this component's own `items.length === 0` — HomeParkList stays
+   *  mounted at all times (never unmounted for bbox-emptiness) so its
+   *  internal filter/geoError state survives every pan. */
+  emptyStateOverride?: ReactNode;
 }
 
 function matchesFilter(park: HomeParkRow, q: string): boolean {
@@ -98,7 +108,14 @@ function toCardItem(
   };
 }
 
-export function HomeParkList({ parks, userLocation, mapCenter, onLocation, onError }: Props) {
+export function HomeParkList({
+  parks,
+  userLocation,
+  mapCenter,
+  onLocation,
+  onError,
+  emptyStateOverride,
+}: Props) {
   const [filter, setFilter] = useState("");
   const [geoError, setGeoError] = useState<GeoErrorReason | null>(null);
   const listRef = useRef<HTMLOListElement>(null);
@@ -177,11 +194,18 @@ export function HomeParkList({ parks, userLocation, mapCenter, onLocation, onErr
       ? `Showing ${countLabel} nearest to you${filter ? ` matching "${filter}"` : ""}.`
       : filter
         ? `Showing ${countLabel} matching "${filter}".`
-        : "";
+        : `Showing ${countLabel}.`;
 
   return (
     <section aria-labelledby="park-list-heading" className="px-4 py-4">
-      <h2 id="park-list-heading" className="text-xs font-bold uppercase tracking-wider">
+      {/* tabIndex={-1} restored 2026-07-06 — makes this a valid, non-tab-order
+          focus target so "See all parks" (SyncedMapList) can move focus here
+          after a bbox reset instead of losing it to <body>. */}
+      <h2
+        id="park-list-heading"
+        tabIndex={-1}
+        className="text-xs font-bold uppercase tracking-wider"
+      >
         {userLocation ? "Nearest to you" : "All Pennsylvania skateparks"}
       </h2>
 
@@ -212,13 +236,21 @@ export function HomeParkList({ parks, userLocation, mapCenter, onLocation, onErr
       ) : null}
 
       {items.length === 0 ? (
-        // Two distinct empty states — without this branch, a DB returning zero
-        // parks would render the nonsense "No parks match ''" copy with no
-        // filter to clear.
+        // Three empty states, discriminated on `parks` (the incoming prop)
+        // rather than `items` (the post-text-filter result) — CRITICAL:
+        // this keeps a text-filter miss on a non-empty `parks` set from
+        // ever showing the bbox-empty override, even if a caller passes
+        // one (restored 2026-07-06; see HomeParkList.test.tsx's regression
+        // guard). (1) `parks` itself empty + override supplied → bbox-empty
+        // copy. (2) `parks` itself empty, no override → DB genuinely empty.
+        // (3) `parks` non-empty but text filter matched nothing → filter
+        // copy, regardless of any override prop.
         parks.length === 0 ? (
-          <p className="mt-4 text-sm">
-            No parks available right now. Check back soon.
-          </p>
+          (emptyStateOverride ?? (
+            <p className="mt-4 text-sm">
+              No parks available right now. Check back soon.
+            </p>
+          ))
         ) : (
           <p className="mt-4 text-sm">
             No parks match &ldquo;{filter.trim()}&rdquo;. Try a different term, or clear the filter.

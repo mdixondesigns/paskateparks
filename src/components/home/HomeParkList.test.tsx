@@ -81,10 +81,13 @@ describe("HomeParkList", () => {
       expect(screen.queryByText(/\d+\.\d+ mi$/)).not.toBeInTheDocument();
     });
 
-    it("renders an empty role=status region", () => {
+    it("renders a park count in the role=status region (no location, no filter)", () => {
+      // Restored 2026-07-06 — closes the dormant "Homepage shows 'Showing N
+      // parks' by default" TODOS.md item; also feeds the bbox-filter count
+      // through the existing aria-live region with zero new plumbing.
       render(<HomeParkList parks={PARKS} />);
       const status = screen.getByRole("status");
-      expect(status.textContent ?? "").toBe("");
+      expect(status.textContent).toBe(`Showing ${PARKS.length} parks.`);
     });
   });
 
@@ -236,6 +239,87 @@ describe("HomeParkList", () => {
       render(<HomeParkList parks={[]} />);
       expect(screen.getByRole("heading")).toBeInTheDocument();
       expect(screen.queryByRole("list")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("emptyStateOverride (restored 2026-07-06 — bbox-filter empty state)", () => {
+    it("renders the override instead of the default empty copy when parks is empty and override is supplied", () => {
+      render(
+        <HomeParkList
+          parks={[]}
+          emptyStateOverride={<p data-testid="bbox-empty">No skateparks in this area.</p>}
+        />,
+      );
+      expect(screen.getByTestId("bbox-empty")).toBeInTheDocument();
+      expect(screen.queryByText(/no parks available right now/i)).not.toBeInTheDocument();
+    });
+
+    it("falls back to the default DB-empty branch when override is absent", () => {
+      render(<HomeParkList parks={[]} />);
+      expect(screen.getByText(/no parks available right now/i)).toBeInTheDocument();
+    });
+
+    it("ignores the override when items are non-empty (no filter active)", () => {
+      render(
+        <HomeParkList
+          parks={PARKS}
+          emptyStateOverride={<p data-testid="bbox-empty">Should not render</p>}
+        />,
+      );
+      expect(screen.queryByTestId("bbox-empty")).not.toBeInTheDocument();
+      expect(screen.getByRole("list")).toBeInTheDocument();
+    });
+
+    it("falls back to the text-filter-empty branch (not the override) when a search matches nothing, even if override is supplied", () => {
+      // CRITICAL regression guard (eng review T9): the wrapper only ever
+      // supplies emptyStateOverride when ITS OWN visibleParks is empty —
+      // but this test locks in that HomeParkList itself never confuses a
+      // text-filter miss for a bbox-empty override, even in the (real)
+      // scenario where a stale override prop and a fresh filter combine.
+      render(
+        <HomeParkList
+          parks={PARKS}
+          emptyStateOverride={<p data-testid="bbox-empty">Should not render</p>}
+        />,
+      );
+      fireEvent.change(screen.getByPlaceholderText(/filter by name or city/i), {
+        target: { value: "zzz-no-match" },
+      });
+      expect(screen.queryByTestId("bbox-empty")).not.toBeInTheDocument();
+      expect(screen.getByText(/no parks match/i)).toBeInTheDocument();
+    });
+
+    it("internal filter text survives across an emptyStateOverride transition (D5 regression guard)", () => {
+      const { rerender } = render(<HomeParkList parks={PARKS} />);
+      const input = screen.getByPlaceholderText(/filter by name or city/i);
+      fireEvent.change(input, { target: { value: "FDR" } });
+      expect((input as HTMLInputElement).value).toBe("FDR");
+
+      // Simulate the wrapper narrowing to zero coordinate-having parks —
+      // HomeParkList stays mounted the whole time (never remounted), so
+      // its internal filter state must survive.
+      rerender(
+        <HomeParkList
+          parks={[]}
+          emptyStateOverride={<p data-testid="bbox-empty">No skateparks in this area.</p>}
+        />,
+      );
+      expect(screen.getByTestId("bbox-empty")).toBeInTheDocument();
+
+      rerender(<HomeParkList parks={PARKS} />);
+      expect((screen.getByPlaceholderText(/filter by name or city/i) as HTMLInputElement).value).toBe(
+        "FDR",
+      );
+    });
+  });
+
+  describe("#park-list-heading focusability (D12 — See all parks focus target)", () => {
+    it("has tabIndex=-1 so it can receive programmatic focus", () => {
+      render(<HomeParkList parks={PARKS} />);
+      const heading = screen.getByRole("heading");
+      expect(heading).toHaveAttribute("tabindex", "-1");
+      heading.focus();
+      expect(document.activeElement).toBe(heading);
     });
   });
 });
