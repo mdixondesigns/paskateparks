@@ -116,6 +116,7 @@ Captured by /plan-eng-review on 2026-05-30. Items the eng review surfaced but ex
 ### `<DirectoryShell>` reusable component for /county + /obstacle archives (D3.2)
 **What:** Extract the synced map+list layout on `/` (`SyncedMapList.tsx` wrapper composing `HomeParkList` + `MapView` with shared URL/bbox/selectedParkId state) into a `<DirectoryShell parks={...}>` component, then drop it into `/county/[slug]/page.tsx` and `/obstacle/[slug]/page.tsx`. Each archive becomes a scoped synced view (parks limited to the taxonomy).
 **Why:** D3.2 was deferred so the synced-pane pattern could prove itself on `/` first. Three duplicated layouts on the production homepage + 14 county archives + 38 obstacle archives is the moment to abstract — but only AFTER the prototype is real and the edge cases are caught.
+**Update 2026-07-06:** the sync model on `/` changed from sort-only (Plan A, shipped 2026-06-22) to automatic bbox-filtering — the list now always shows exactly the parks whose coordinates fall within the map's visible bounds. Parks without coordinates are EXCLUDED from the synced list (matching the map's own behavior — see the "Wherehouse54" entry above, the one park this currently affects). Whoever picks up this extraction should generalize the CURRENT bbox-filter behavior, not the stale sort-only model this note originally described.
 **Pros:** One layout component to maintain. Consistent visual + interaction model across the directory. Taxonomy archives get the bbox-filter + URL-share affordances for free.
 **Cons:** Premature abstraction risk — if the homepage and the archives diverge in subtle ways (different empty states, different counts, different fitBounds defaults), the shell either grows props for every variant or splits back into siblings. Hold for one production cycle on `/` first.
 **Context:** Phase 10 D3.2 (eng review, 2026-06-22). Effort: L (probably 2-3 days — extract the wrapper, parameterize the data source, migrate 2 routes, write archive-flavored e2e). The current SyncedMapList does enough state lifting that the boundary is mostly clean; the real work is data-source parameterization and the archive intro-copy block above the synced shell.
@@ -228,6 +229,26 @@ Captured by /plan-eng-review on 2026-05-30. Items the eng review surfaced but ex
 **Pros:** Catches a class of bug that desktop testing misses.
 **Cons:** Playwright mobile emulation isn't perfect for iframe keyboard interaction.
 **Context:** Worth a manual real-device test before launch even if the Playwright test passes.
+
+### Wherehouse54 (Lancaster) is missing coordinates
+**What:** Geocode Wherehouse54's address and add `lat`/`lng` to its database record.
+**Why:** `pnpm db:check-coords` confirms it's the ONLY park (of 159) in the database currently missing coordinates. It doesn't appear on the map, and as of the 2026-07-06 automatic bbox-filter change, it also doesn't appear in the homepage's synced list (it's still reachable via `/county/lancaster`, relevant `/obstacle/*` archives, and direct URL). Note: TODOS.md's older "Owner workflow for 99 stub parks" entry is stale on this point — the owner has clearly been geocoding stubs over time, and only this one remains.
+**Pros:** Trivial fix — one address lookup + one DB update — that eliminates the gap at the source instead of requiring ongoing code accommodation.
+**Cons:** Requires confirming the business's actual address and writing to the production database (a live-data change, done deliberately and separately from code changes).
+**Context:** Surfaced by the 2026-07-06 `/plan-eng-review` outside-voice (Codex) pass while reviewing the automatic bbox-filter plan — the plan's original fix assumed ~99 parks lacked coordinates (per the stale entry above) and built more architecture than needed; checking `pnpm db:check-coords` against live data found only this one.
+**Effort:** S (~10 min once the address is confirmed).
+**Priority:** P2.
+**Depends on:** Nothing.
+
+### Cold load with a URL-supplied viewport briefly shows the unfiltered list (mobile always, desktop as a brief flash)
+**What:** `/` shows the full unfiltered park list until the map has mounted and fired its first `moveend` — there's no live Leaflet instance (and therefore no real map bounds) before then. A shared URL like `/?lat=X&lng=Y&zoom=Z` therefore renders the FULL list for a moment before narrowing, even though the URL implies a specific area of interest. On **mobile** this persists indefinitely until the user taps "Map" (no live map exists at all pre-tap). On **desktop** the map mounts immediately, so the gap is usually a sub-frame flash (`animate:false` makes the init + first moveend land in the same effect flush) — worse on slow connections where `MapView`'s lazy-loaded JS chunk takes longer to arrive.
+**Why:** Someone sharing a deep-link to "parks near this spot" would expect the list to already be scoped to that URL's area from first paint, not flash the full list first.
+**Pros:** Closes a real (if narrow, and on desktop usually imperceptible) inconsistency between what the URL implies and what first paint shows.
+**Cons:** Requires reimplementing Leaflet's center+zoom-to-bounds projection math independently of Leaflet itself (since it needs to run before Leaflet mounts) — meaningfully more complex and more error-prone than the edge case it solves, for a URL-sharing pattern not yet confirmed to be common.
+**Context:** Originally surfaced mobile-only by the 2026-07-06 CEO review's outside-voice (Codex) pass on the automatic bbox-filter plan, then widened to desktop by the `/ship` red-team review the same day, which confirmed the identical root cause (`mapBounds` starts `null` until the first `moveend`) applies on both platforms — just with different practical severity. Explicitly deferred both times rather than folded into that PR, to avoid reopening its already-settled scope with unproven-value complexity.
+**Effort:** S (human: ~2-3h / CC: ~30min).
+**Priority:** P2.
+**Depends on:** Nothing — lower priority until URL-sharing usage is actually observed.
 
 ### Homepage scaling breakpoint
 **What:** Add a build-time warning in `getAllParksForHomepage()` (src/lib/park-query.ts) when the parks count exceeds 200. At 48 the client-serialized list is ~7KB; at 500 it would be ~75KB and the client-side sort+filter model starts hurting cold-load perf. When the warn fires, switch to either pagination/virtualization or a server-routed sort (`?near=lat,lng` query string with server-side sort).
