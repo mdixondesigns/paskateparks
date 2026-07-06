@@ -354,7 +354,7 @@ describe("MapView — Leaflet init flow", () => {
       expect(eventsBound).not.toContain("zoomstart");
     });
 
-    it("fires onMoveEnd with lat/lng/zoom when moveend fires", () => {
+    it("fires onMoveEnd with lat/lng/zoom/bounds when moveend fires", () => {
       const onMoveEnd = vi.fn();
       render(<MapView parks={PA_PARKS} onMoveEnd={onMoveEnd} />);
       mapInstance.__setView(
@@ -363,13 +363,31 @@ describe("MapView — Leaflet init flow", () => {
         11,
       );
       mapInstance.__fire("moveend");
-      // Bounds were dropped from the event shape (Plan A — sort by center,
-      // never bbox-filter — so the wrapper only needs lat/lng/zoom).
+      // Restored 2026-07-06 — bounds feed the wrapper's bbox-filter.
       expect(onMoveEnd).toHaveBeenCalledExactlyOnceWith({
         lat: 40,
         lng: -75.5,
         zoom: 11,
+        bounds: { south: 39.9, west: -76.0, north: 40.1, east: -75.0 },
       });
+    });
+
+    it("fitAllRequestId does NOT re-fit on initial mount (off-by-default guard)", () => {
+      render(<MapView parks={PA_PARKS} fitAllRequestId={0} />);
+      // Only the init effect's own fallback fitBounds call should have fired.
+      expect(mapInstance.fitBounds).toHaveBeenCalledTimes(1);
+      expect(mapInstance.setView).not.toHaveBeenCalledWith(
+        expect.anything(),
+        expect.anything(),
+        expect.objectContaining({ animate: false }),
+      );
+    });
+
+    it("fitAllRequestId re-fits to all parks when incremented", () => {
+      const { rerender } = render(<MapView parks={PA_PARKS} fitAllRequestId={0} />);
+      mapInstance.fitBounds.mockClear();
+      rerender(<MapView parks={PA_PARKS} fitAllRequestId={1} />);
+      expect(mapInstance.fitBounds).toHaveBeenCalledTimes(1);
     });
 
     it("selectedParkId effect calls marker.openPopup on the matching marker", () => {

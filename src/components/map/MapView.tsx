@@ -124,6 +124,10 @@ export interface MapMoveEnd {
   lat: number;
   lng: number;
   zoom: number;
+  /** The map's visible rectangle at this moveend — feeds the wrapper's
+   *  bbox-filter (restored 2026-07-06). Always present; moveend only ever
+   *  fires after the init effect's setView/fitBounds has already run. */
+  bounds: { south: number; west: number; north: number; east: number };
 }
 
 export interface MapViewProps {
@@ -144,11 +148,48 @@ export interface MapViewProps {
   /** Fires after every map move/zoom settles. The wrapper drives mapCenter
    *  sort + the debounced URL write from this. */
   onMoveEnd?: (event: MapMoveEnd) => void;
+  /** Bump this (e.g. via a counter) to re-run the fit-to-all-parks view —
+   *  restored 2026-07-06 for the "See all parks" reset affordance. The
+   *  fit-to-all logic otherwise only runs once, inside the init effect;
+   *  this prop is the sole way to re-trigger it. undefined/0 on first
+   *  render must NOT fire a re-fit — only real increments should. */
+  fitAllRequestId?: number;
   /** Fires when a marker's popup opens — wrapper uses this for the persistent
    *  .card-selected highlight on the matching list card. */
   onPopupOpen?: (parkId: number) => void;
   /** Fires when a marker's popup closes — clears the highlight. */
   onPopupClose?: (parkId: number) => void;
+}
+
+// Fit-to-all-parks view math, shared by the init effect's fallback branch
+// and the fitAllRequestId effect ("See all parks" reset) — restored
+// 2026-07-06. R4 fallback: a degenerate single-point bbox would make
+// fitBounds NaN, so a single park (or a cluster of identical coords) uses
+// setView at CLOSE_ZOOM instead.
+function fitAllParks(map: L.Map, parks: MapPark[]): void {
+  if (parks.length === 0) {
+    // Empty edge case — shouldn't happen because the RSC filters to open
+    // parks-with-coords, but defend anyway.
+    map.setView(PA_CENTROID, PA_DEFAULT_ZOOM, { animate: false });
+    return;
+  }
+  const lats = parks.map((p) => p.lat);
+  const lngs = parks.map((p) => p.lng);
+  const minLat = Math.min(...lats);
+  const maxLat = Math.max(...lats);
+  const minLng = Math.min(...lngs);
+  const maxLng = Math.max(...lngs);
+  if (minLat === maxLat && minLng === maxLng) {
+    map.setView([minLat, minLng], CLOSE_ZOOM, { animate: false });
+  } else {
+    map.fitBounds(
+      [
+        [minLat, minLng],
+        [maxLat, maxLng],
+      ],
+      { padding: FIT_BOUNDS_PADDING, animate: false },
+    );
+  }
 }
 
 export function MapView({
@@ -160,6 +201,7 @@ export function MapView({
   onMoveEnd,
   onPopupOpen,
   onPopupClose,
+  fitAllRequestId,
 }: MapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
@@ -275,10 +317,17 @@ export function MapView({
     map.on("moveend", () => {
       if (!onMoveEndRef.current) return;
       const center = map.getCenter();
+      const bounds = map.getBounds();
       onMoveEndRef.current({
         lat: center.lat,
         lng: center.lng,
         zoom: map.getZoom(),
+        bounds: {
+          south: bounds.getSouth(),
+          west: bounds.getWest(),
+          north: bounds.getNorth(),
+          east: bounds.getEast(),
+        },
       });
     });
 
@@ -289,29 +338,8 @@ export function MapView({
     // moveends would otherwise leak as "user pan" and write the URL.
     if (initialView) {
       map.setView([initialView.lat, initialView.lng], initialView.zoom, { animate: false });
-    } else if (parks.length === 0) {
-      // Empty edge case — shouldn't happen because the RSC filters to open
-      // parks-with-coords, but defend anyway. 48/48 currently have coords.
-      map.setView(PA_CENTROID, PA_DEFAULT_ZOOM, { animate: false });
     } else {
-      const lats = parks.map((p) => p.lat);
-      const lngs = parks.map((p) => p.lng);
-      const minLat = Math.min(...lats);
-      const maxLat = Math.max(...lats);
-      const minLng = Math.min(...lngs);
-      const maxLng = Math.max(...lngs);
-      // R4 fallback: degenerate single-point bbox would make fitBounds NaN.
-      if (minLat === maxLat && minLng === maxLng) {
-        map.setView([minLat, minLng], CLOSE_ZOOM, { animate: false });
-      } else {
-        map.fitBounds(
-          [
-            [minLat, minLng],
-            [maxLat, maxLng],
-          ],
-          { padding: FIT_BOUNDS_PADDING, animate: false },
-        );
-      }
+      fitAllParks(map, parks);
     }
 
     // CMT-3 mount signal moved into the tileLayer.once("load") handler above
@@ -380,6 +408,27 @@ export function MapView({
     if (!marker) return;
     marker.openPopup();
   }, [hoveredParkId]);
+
+  // fitAllRequestId effect — "See all parks" reset (restored 2026-07-06).
+  // Compares against the LAST-SEEN VALUE (not a boolean "have I mounted"
+  // flag) so it never fires a spurious re-fit on mount — only a real
+  // increment from the wrapper's click handler should re-fit the view. A
+  // boolean ref would break under React Strict Mode's double-invocation of
+  // effects on mount: the ref survives the synthetic remount, so the SECOND
+  // invocation would incorrectly think it's no longer "first" even though
+  // fitAllRequestId never actually changed, firing an unwanted fitAllParks
+  // that stomps the initialView-driven setView from the init effect. Value
+  // comparison is immune to this because the prop is identical (still 0)
+  // across both synthetic invocations.
+  const lastFitAllRequestIdRef = useRef(fitAllRequestId);
+  useEffect(() => {
+    if (fitAllRequestId === lastFitAllRequestIdRef.current) return;
+    lastFitAllRequestIdRef.current = fitAllRequestId;
+    const map = mapRef.current;
+    if (!map) return;
+    fitAllParks(map, parks);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- parks is stable (force-static), same rationale as the init effect
+  }, [fitAllRequestId]);
 
   return (
     <div className="relative h-full w-full">
