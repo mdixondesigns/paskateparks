@@ -6,6 +6,28 @@ Captured by /plan-eng-review on 2026-05-30. Items the eng review surfaced but ex
 
 ---
 
+## P0 — launch blockers (target: this month)
+
+Added 2026-07-07 per owner — these must be resolved before launch. Listed as captured; not yet scoped into What/Why/Pros/Cons.
+
+### Small / medium
+
+- **About page needs real content.**
+- **Consolidate the "helmet and pads" section on each park page.**
+- **Proper icons for the social + support links on each park page.**
+- **`cursor: pointer` on all buttons.**
+- **Improve the gallery presentation per park.**
+- **Updated privacy policy with the correct contact email.**
+
+### Big
+
+- **Visitor accounts** — name + profile picture.
+- **Anonymous + registered users suggest park edits, with an incentive layer** — owner wants to focus on incentives specifically: a leaderboard for submissions, point values for different kinds of contributed info.
+- **Credit users who submit photos.**
+- **"Favorite" parks** — scope still open; explore what favoriting should actually do (saved list, just a toggle, feeds the leaderboard/incentive system above, tied to accounts).
+
+---
+
 ## P1 — should ship with v1 or shortly after
 
 ### Global header with logo, site title, and nav
