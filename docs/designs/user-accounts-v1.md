@@ -193,6 +193,11 @@ profile row appears.
   explicitly in the signUp call. Local E2E and production exercise the
   SAME flow.
 - Site URL = production domain; redirect allowlist = production + localhost.
+  **Pre-DNS-flip note (2026-07-11):** paskateparks.com still points at the
+  old WordPress site. Until the DNS flip, Site URL must be
+  `https://paskateparks.vercel.app` (that's where confirmation links must
+  land); switching it to `https://paskateparks.com` is a DNS-flip-day
+  checklist item.
 - Built-in auth rate limits left at defaults.
 - Password minimum length 8+; enable leaked-password protection if plan allows.
 
