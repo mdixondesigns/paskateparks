@@ -18,6 +18,7 @@ import {
   text,
   timestamp,
   uniqueIndex,
+  uuid,
   date,
 } from "drizzle-orm/pg-core";
 
@@ -321,5 +322,17 @@ export const suggestions = pgTable("suggestions", {
   // /24-truncated CIDR (not raw INET) — PII reduction per STACK-PIVOT.md finding #11.
   // API route runs `inet '192.168.1.5' & inet '255.255.255.0'` before insert.
   submitterIpTruncated: cidr("submitter_ip_truncated"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// User accounts v1 (docs/designs/user-accounts-v1.md). 1:1 with auth.users;
+// row is created by the on_auth_user_created trigger, NOT by app code, and
+// id references auth.users(id) ON DELETE CASCADE — both live only in
+// supabase/migrations/0007_profiles.sql because Drizzle doesn't model the
+// auth schema. Reads/writes from app code use the user-scoped @supabase/ssr
+// client (RLS-enforced, decision CM4), NEVER the Drizzle secret-key clients.
+export const profiles = pgTable("profiles", {
+  id: uuid("id").primaryKey(),
+  displayName: text("display_name").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });

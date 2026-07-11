@@ -8,7 +8,7 @@ import { describe, expect, it } from "vitest";
 import * as schema from "./schema";
 
 describe("Drizzle schema — exports match STACK-PIVOT.md §Final schema", () => {
-  it("exports all 11 tables", () => {
+  it("exports all 12 tables", () => {
     const expectedTables = [
       "parks",
       "parkRenovations",
@@ -21,6 +21,7 @@ describe("Drizzle schema — exports match STACK-PIVOT.md §Final schema", () =>
       "shops",
       "parkPhotos",
       "suggestions",
+      "profiles", // user accounts v1 (docs/designs/user-accounts-v1.md)
     ];
     for (const name of expectedTables) {
       expect(schema, `missing table export: ${name}`).toHaveProperty(name);

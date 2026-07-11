@@ -21,7 +21,7 @@ Added 2026-07-07 per owner — these must be resolved before launch. Listed as c
 
 ### Big
 
-- **Visitor accounts** — name + profile picture.
+- **Visitor accounts** — name + profile picture. **IN PROGRESS 2026-07-07:** v1 (email+password, display name, initials avatar) built per [docs/designs/user-accounts-v1.md](docs/designs/user-accounts-v1.md); profile-picture *upload* deliberately deferred (see P1 entry "Avatar file upload").
 - **Anonymous + registered users suggest park edits, with an incentive layer** — owner wants to focus on incentives specifically: a leaderboard for submissions, point values for different kinds of contributed info.
 - **Credit users who submit photos.**
 - **"Favorite" parks** — scope still open; explore what favoriting should actually do (saved list, just a toggle, feeds the leaderboard/incentive system above, tied to accounts).
@@ -30,13 +30,24 @@ Added 2026-07-07 per owner — these must be resolved before launch. Listed as c
 
 ## P1 — should ship with v1 or shortly after
 
-### Global header with logo, site title, and nav
-**What:** No site-wide header exists. `src/app/layout.tsx` has a skip-link explicitly commented as "visible on focus so keyboard users can bypass any future nav" (A6) — so the absence is acknowledged in code, just never implemented. Build a header with the wordmark/logo, "Pennsylvania Skateparks" title, and links to /map and /about. Sticky-or-not is a taste call; per VISUAL-DESIGN.md the warm-cream surface should host it cleanly without a divider until scroll.
-**Why:** Users on /park/<slug>, /county/<X>, /obstacle/<Y>, or /map have no clear way to navigate to other top-level sections. Today the only navigation is footer links. Launch-blocking IA.
-**Pros:** Closes the navigation gap; gives the wordmark a permanent home; makes the skip-link meaningful (it currently jumps over nothing). Unblocks #4 below — once we have a header, breadcrumbs slot in beneath it consistently.
-**Cons:** Touches every page render. Must respect VISUAL-DESIGN.md spacing scale + the cream/ink palette. Affects above-the-fold LCP on the homepage (D6 list-first); keep the markup minimal so it doesn't push the first park card below the fold on mobile.
-**Context:** A new component `src/components/site/SiteHeader.tsx` imported once from `layout.tsx`. Mobile spec: hamburger or inline links? Per DESIGN.md mobile-first principle, two inline links (/map, /about) keep it simple and avoid the hamburger-discoverability problem. Read VISUAL-DESIGN.md before designing — the wordmark treatment, divider system, and colors are locked there.
-**Depends on:** Nothing.
+### Widen profiles SELECT policy when the leaderboard/photo-credit surface ships
+**What:** `supabase/migrations/0007_profiles.sql` (user-accounts v1) restricts `profiles` SELECT to own-row (`auth.uid() = id`) per eng-review decision CM3 (2026-07-07). The leaderboard / photo-credit features need OTHER users' display names, so the policy must widen to public read in the same migration that ships that surface — plus the RLS-audit test updates to match.
+**Why:** Without this tripwire, the leaderboard renders empty names and the failure looks like a data bug, not a policy decision made in July.
+**Pros:** One-line policy change + one test update, shipped exactly when a product surface justifies the exposure.
+**Cons:** None — deferred exposure was the point.
+**Context:** Eng review of docs/designs/user-accounts-v1.md, outside-voice finding CM3. v1 exposes no display name to anyone but the owner of the row.
+**Depends on:** The incentive/leaderboard P0 task.
+
+### Avatar file upload (post-launch half of the accounts P0 item)
+**What:** v1 accounts ship generated initials avatars only (decision D2, 2026-07-07). Real profile-picture upload: dedicated `avatars` Storage bucket, per-user-path RLS write policies, size/MIME caps mirroring the photos bucket (10MB; jpeg/png/webp), Sharp square-resize modeled on scripts/migrate-wp.ts, InitialsAvatar as permanent fallback.
+**Why:** The owner's original launch-blocker ask was "name and profile picture" — this is the deliberately deferred picture half.
+**Pros:** Cuts the entire user-file-upload attack surface from the launch-month build; upload lands later against a stable auth base.
+**Cons:** Users who want a real photo wait for a follow-up release.
+**Context:** docs/designs/user-accounts-v1.md "NOT in scope". The upload endpoint is the single riskiest surface accounts will ever add — build it unhurried.
+**Depends on:** User accounts v1 shipped.
+
+### ~~Global header with logo, site title, and nav~~ — DONE (stale entry)
+**Resolved before 2026-07-07:** `src/components/site/SiteHeader.tsx` exists (wordmark + NavLinks), wired into layout.tsx with tests and a Storybook story. This entry had drifted stale — caught during the 2026-07-07 user-accounts eng review (same doc-drift pattern as the 99-stub-parks count). The user-accounts work added the Sign in / avatar item to NavLinks.
 
 ### Park profile breadcrumbs (back to listing)
 **What:** /park/<slug> pages have no clear way back to the directory. Reuse the existing breadcrumb component pattern from `src/app/county/[slug]/page.tsx:113` (`<nav aria-label="Breadcrumb">` + `breadcrumbJsonLd` for SEO).

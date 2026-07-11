@@ -15,7 +15,18 @@
 -- (no existing tracking table) goes straight to the secure state without
 -- needing this migration to apply.
 
-ALTER TABLE "__paskateparks_migrations" ENABLE ROW LEVEL SECURITY;
+-- Conditional (2026-07-07, user-accounts v1): on a FRESH database (e.g.
+-- `supabase start` for the local test stack) this table doesn't exist yet —
+-- scripts/db-migrate.ts creates it later, WITH RLS at create time (see
+-- comment above). Skipping when absent is therefore safe everywhere:
+-- production had the table when this migration originally ran; fresh DBs
+-- get RLS from the bootstrap path.
+DO $$
+BEGIN
+  IF to_regclass('public.__paskateparks_migrations') IS NOT NULL THEN
+    ALTER TABLE "__paskateparks_migrations" ENABLE ROW LEVEL SECURITY;
+  END IF;
+END $$;
 
 -- No policies: anon role has zero access; service_role bypasses RLS. Matches
 -- the posture documented in 0001_rls.sql.

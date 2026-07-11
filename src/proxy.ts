@@ -1,6 +1,8 @@
+import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 import { COOKIE_NAME, sign, verify } from "@/lib/admin-auth";
+import { env } from "@/lib/public-env";
 import { isRetiredBuilderOrShopPath } from "@/lib/retired-urls";
 
 // Phase 9 proxy (formerly middleware — renamed for Next 16 per https://nextjs.org/docs/messages/middleware-to-proxy) — two responsibilities:
@@ -16,10 +18,28 @@ import { isRetiredBuilderOrShopPath } from "@/lib/retired-urls";
 //       / tampered → redirect to /admin/login. Valid + past sliding-refresh
 //       threshold (12h used of 24h TTL) → re-issue cookie and pass through.
 //
+//  3. Supabase session refresh for the visitor-accounts routes (/login,
+//     /account, /auth/*) — user-accounts v1, decision 1A + CM6.4.
+//     Branch ordering contract: the 410 and /admin/* branches return FIRST,
+//     exactly as before; Supabase code runs only for its own disjoint path
+//     set, so no request ever needs response-cookie merging between the
+//     admin HMAC cookie and Supabase's session cookies.
+//     /account additionally requires a session (redirect to /login).
+//
 // The matcher (bottom of file) restricts middleware to /builder/*, /shop/*,
-// /admin/* — Vercel Hobby's Edge Middleware budget is 1M invocations/mo,
-// and a naive "run on everything" would burn through it via crawler hits on
-// /park/<slug> and the 52 taxonomy archives (CMT-7 outside voice).
+// /admin/*, /login, /account, /auth/* — Vercel Hobby's Edge Middleware
+// budget is 1M invocations/mo, and a naive "run on everything" would burn
+// through it via crawler hits on /park/<slug> and the 52 taxonomy archives
+// (CMT-7 outside voice). Supabase's canonical run-on-everything middleware
+// matcher must NEVER be adopted here for the same reason.
+//
+//                         request
+//                            │
+//              ┌─────────────┼──────────────────┐
+//              ▼             ▼                  ▼
+//        /builder|/shop   /admin/*        /login /account /auth/*
+//         410 + body     HMAC gate        Supabase session refresh
+//         (return)       (return)         (+ /account → session gate)
 
 export async function proxy(request: NextRequest): Promise<NextResponse> {
   const { pathname } = request.nextUrl;
@@ -69,12 +89,74 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
     return response;
   }
 
+  // 4. Visitor-accounts routes → Supabase session refresh (+ /account gate).
+  if (isSupabaseAuthPath(pathname)) {
+    return refreshSupabaseSession(request);
+  }
+
   // Anything outside the matcher shouldn't reach here, but bypass safely if it does.
   return NextResponse.next();
 }
 
+function isSupabaseAuthPath(pathname: string): boolean {
+  return (
+    pathname === "/login" ||
+    pathname === "/account" ||
+    pathname === "/auth" ||
+    pathname.startsWith("/auth/")
+  );
+}
+
+// Canonical @supabase/ssr session refresh (https://supabase.com/docs/guides/auth/server-side/nextjs),
+// scoped to the auth routes above. Refreshes an expired session and syncs
+// the rotated cookies onto both the forwarded request and the response.
+async function refreshSupabaseSession(request: NextRequest): Promise<NextResponse> {
+  let response = NextResponse.next({ request });
+
+  const supabase = createServerClient(
+    env.NEXT_PUBLIC_SUPABASE_URL,
+    env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+    {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll();
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
+          response = NextResponse.next({ request });
+          cookiesToSet.forEach(({ name, value, options }) =>
+            response.cookies.set(name, value, options),
+          );
+        },
+      },
+    },
+  );
+
+  // getClaims() verifies the JWT locally and triggers the refresh flow when
+  // expired (decision 2A). If Supabase Auth is unreachable, claims come back
+  // null and we fail OPEN to signed-out — the page still loads (failure-mode
+  // table in docs/designs/user-accounts-v1.md).
+  const { data } = await supabase.auth.getClaims();
+
+  // /account requires a session; everything else on these routes is public.
+  if (!data?.claims && request.nextUrl.pathname === "/account") {
+    const loginUrl = new URL("/login", request.url);
+    return NextResponse.redirect(loginUrl);
+  }
+
+  return response;
+}
+
 export const config = {
-  matcher: ["/builder/:path*", "/shop/:path*", "/admin/:path*", "/admin"],
+  matcher: [
+    "/builder/:path*",
+    "/shop/:path*",
+    "/admin/:path*",
+    "/admin",
+    "/login",
+    "/account",
+    "/auth/:path*",
+  ],
 };
 
 // Inline HTML for the 410 page. Small, no external CSS, the kind of body

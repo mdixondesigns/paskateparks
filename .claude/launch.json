@@ -13,6 +13,18 @@
       "runtimeArgs": ["dev"],
       "port": 3000,
       "autoPort": true
+    },
+    {
+      "name": "dev-local-auth",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321",
+        "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH",
+        "pnpm",
+        "dev"
+      ],
+      "port": 3000,
+      "autoPort": true
     }
   ]
 }
