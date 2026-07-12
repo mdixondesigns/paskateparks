@@ -185,6 +185,18 @@ profile row appears.
 
 ## Supabase Auth configuration (dashboard, launch checklist)
 
+**Status 2026-07-11: LIVE.** Migration 0007 applied to prod; publishable key
+in Vercel env (Production + Preview); confirm-email ON; min password 8;
+Site URL = paskateparks.vercel.app; custom SMTP via Resend
+(no-reply@paskateparks.com) — note Supabase gates ALL template editing
+behind custom SMTP, so Resend was a hard prerequisite, not just a volume
+fix; token_hash confirmation template applied. Full loop verified by the
+owner with a real signup on 2026-07-11. Remaining for DNS-flip day: switch
+Site URL to paskateparks.com (note below).
+Dashboard gotcha: the production Supabase project is labeled
+"paskateparks-dev" in the dashboard — ref djhuxetdljryleztkdrp is the one
+the site uses.
+
 - Email provider on; confirm email REQUIRED.
 - Confirmation flow pinned (CM6.5): the email template links to
   `/auth/confirm?token_hash=...&type=email`; the route handler calls
