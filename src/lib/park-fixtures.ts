@@ -51,7 +51,10 @@ export function buildPark(overrides: Partial<ParkWithRelations> = {}): ParkWithR
 // A photo path that resolves against the real Supabase Storage bucket
 // (NEXT_PUBLIC_SUPABASE_URL from .env.local) — swap for any real storage
 // path from the `photos` bucket to preview against an actual photo.
-export const SAMPLE_PHOTO_PATH = "parks/fdr-skatepark/photo-01";
+// A real object in the public photos bucket so Storybook renders an actual
+// image (park slug is "fdr", photos are zero-indexed: photo-00). Was previously
+// "parks/fdr-skatepark/photo-01", which 404'd — every photo story rendered blank.
+export const SAMPLE_PHOTO_PATH = "parks/fdr/photo-00";
 
 // A fully "rich" park — every section has data, for previewing the complete
 // 16-section profile at once.
