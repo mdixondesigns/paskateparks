@@ -1,5 +1,14 @@
 @import "tailwindcss";
 
+/* Tailwind v4 Preflight resets interactive controls to cursor: default. Restore
+   the pointer cursor site-wide in one place rather than per-button utility
+   classes. Disabled controls keep their own cursor (e.g. cursor-not-allowed). */
+button:not(:disabled),
+[role="button"]:not(:disabled),
+summary {
+  cursor: pointer;
+}
+
 /* Honor prefers-reduced-motion per VISUAL-DESIGN.md §7 + A6 accessibility lock. */
 @media (prefers-reduced-motion: reduce) {
   *,
