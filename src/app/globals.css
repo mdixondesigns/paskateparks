@@ -116,7 +116,11 @@ body[data-map-mounted="true"] .map-fallback-list {
     border: 0;
   }
   .park-modal .park-modal__content {
-    min-height: 100dvh;
+    /* height (not min-height) so overflow-y:auto has an upper bound to scroll
+       within — min-height alone let the box grow past the viewport, and the
+       overflow:hidden dialog then clipped everything below the fold. Fills the
+       screen when content is short, scrolls when it's tall (e.g. hero image). */
+    height: 100dvh;
     overflow-y: auto;
   }
 }
