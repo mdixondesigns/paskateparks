@@ -83,4 +83,33 @@ describe("Connect/Support partitioning per D21/D23", () => {
     );
     expect(screen.getByText(/@fdrskatepark/)).toBeInTheDocument();
   });
+
+  it("renders a platform icon in each link row", () => {
+    const { container } = render(
+      <ConnectSection links={[link({ id: 1, type: "facebook", url: "https://fb.com/x" })]} />,
+    );
+    expect(container.querySelector("a svg")).toBeInTheDocument();
+  });
+
+  it("keeps the platform name in the link's accessible name even when a handle is the visible label", () => {
+    render(
+      <ConnectSection
+        links={[
+          link({
+            id: 1,
+            type: "instagram",
+            url: "https://instagram.com/fdrskatepark",
+            label: "@fdrskatepark",
+          }),
+        ]}
+      />,
+    );
+    // Visible text is the handle; the platform word is not spelled out visually...
+    expect(screen.getByText("@fdrskatepark")).toBeInTheDocument();
+    expect(screen.queryByText("Instagram")).not.toBeInTheDocument();
+    // ...but the accessible name still announces the platform for screen readers.
+    expect(
+      screen.getByRole("link", { name: /Instagram: @fdrskatepark/i }),
+    ).toBeInTheDocument();
+  });
 });

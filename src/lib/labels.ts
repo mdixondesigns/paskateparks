@@ -19,7 +19,7 @@ import type {
 
 type AmenityType = (typeof amenityType.enumValues)[number];
 type HelmetsPolicy = (typeof helmetsPolicy.enumValues)[number];
-type LinkType = (typeof linkType.enumValues)[number];
+export type LinkType = (typeof linkType.enumValues)[number];
 type ObstacleType = (typeof obstacleType.enumValues)[number];
 type RidingSurface = (typeof ridingSurface.enumValues)[number];
 type ParkStatus = (typeof parkStatus.enumValues)[number];
