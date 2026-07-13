@@ -5,7 +5,8 @@ import PrivacyPage from "./page";
 
 // CMT-1 from plan-eng-review: a site that asks for location must have real
 // privacy copy about location. These tests guard the copy from regressing
-// back to a one-line placeholder.
+// back to a one-line placeholder, plus the account/processor disclosures added
+// after user-accounts-v1 shipped.
 
 describe("/privacy page (CMT-1: real geolocation handling copy)", () => {
   it("renders an h1", () => {
@@ -34,13 +35,22 @@ describe("/privacy page (CMT-1: real geolocation handling copy)", () => {
 
   it("provides a contact email", () => {
     render(<PrivacyPage />);
-    const link = screen.getByRole("link", { name: /michael@inclind.com/i });
-    expect(link).toHaveAttribute("href", "mailto:michael@inclind.com");
+    const link = screen.getByRole("link", { name: /mike@paskateparks.com/i });
+    expect(link).toHaveAttribute("href", "mailto:mike@paskateparks.com");
   });
 
-  it("marks cookies + analytics as placeholder until phase 10", () => {
+  it("states no third-party analytics or tracking cookies", () => {
     render(<PrivacyPage />);
     expect(screen.getByRole("heading", { level: 2, name: /cookies/i })).toBeInTheDocument();
+    expect(screen.getByText(/does not run third-party analytics/i)).toBeInTheDocument();
+  });
+
+  it("discloses accounts + the processors we send data to", () => {
+    render(<PrivacyPage />);
+    expect(screen.getByRole("heading", { level: 2, name: /accounts/i })).toBeInTheDocument();
+    expect(screen.getAllByText(/Supabase/).length).toBeGreaterThan(0);
+    expect(screen.getByText(/Vercel/)).toBeInTheDocument();
+    expect(screen.getByText(/Resend/)).toBeInTheDocument();
   });
 
   it("renders inside the <main id='main'> landmark", () => {
