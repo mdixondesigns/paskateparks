@@ -13,7 +13,7 @@ Added 2026-07-07 per owner — these must be resolved before launch. Listed as c
 ### Small / medium
 
 - **About page needs real content.**
-- **Consolidate the "helmet and pads" section on each park page.**
+- **Consolidate the "helmet and pads" section on each park page.** — HELD 2026-07-13 after /plan-eng-review (not a launch blocker; leaving live site as-is). Proposal was: drop the structured `helmets`/`otherPadsRequired` columns + `helmets_policy` enum, move Park rules into a `<details>` accordion, and show a photo of the park's posted rules sign + free-text specifics. Outside voice killed it for launch: (1) there is **no admin park-editing UI and no owner→park/role model** (only `admin/lint` + `admin/login`; `profiles` = id/display_name/created_at), so `rulesSignPhotoPath` would ship **null for 100% of parks** — the sign photo can't be populated, which removes the entire rationale for dropping helmet data; (2) dropping the enum/columns is irreversible + needs a prod backfill script (a SQL migration can't call the TS `helmetsBackfillSentence()`), Drizzle snapshot regen, and ~9-file cleanup (`db-verify.ts` EXPECTED_ENUMS + count, `db-seed-fdr.ts`, `schema.test.ts`, `ParkProfile.test`/`Overview.test` inline fields, `migrate-wp/*`, `labels.ts`, fixtures, stories). **When revisited:** the reversible path is soft-deprecate (stop *rendering* helmets/pads, keep the data one release) + accordion, and it depends on first building an admin ingest path for the sign photo (ties into the deferred user/file-upload work, TODOS P1). Reverses DESIGN.md D16 — record the decision there if it proceeds.
 - **Proper icons for the social + support links on each park page.**
 - **`cursor: pointer` on all buttons.**
 - **Improve the gallery presentation per park.**
