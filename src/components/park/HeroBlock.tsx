@@ -11,19 +11,30 @@ interface Props {
 // Visual styling is deferred per A6 — semantic structure is set up so VISUAL-DESIGN.md
 // §16 can attach the dark band + photo treatment later.
 export function HeroBlock({ park }: Props) {
-  const heroPhoto = park.photos[0];
+  // Prefer a purpose-shot panorama (parks.hero_photo_path); fall back to the
+  // first gallery photo, which is also the map marker/popup thumbnail. When a
+  // dedicated panorama is set it carries no caption/credit of its own, so the
+  // alt is the generic hero label; the fallback keeps the gallery photo's alt.
+  const galleryLead = park.photos[0];
+  const heroStoragePath = park.heroPhotoPath ?? galleryLead?.storagePath ?? null;
+  const heroAlt = park.heroPhotoPath
+    ? `${park.name} hero photo`
+    : (galleryLead?.altText ?? galleryLead?.caption ?? `${park.name} hero photo`);
   const renovationYears = park.renovations.map((r) => r.year);
 
   return (
     <header className="px-4 py-6">
-      {heroPhoto ? (
+      {heroStoragePath ? (
         <ResponsiveImage
-          storagePath={heroPhoto.storagePath}
-          alt={heroPhoto.altText ?? heroPhoto.caption ?? `${park.name} hero photo`}
+          storagePath={heroStoragePath}
+          alt={heroAlt}
           sizes="(max-width: 768px) 100vw, 720px"
           loading="eager"
           fetchPriority="high"
-          className="mb-4 block aspect-[375/420] w-full object-cover"
+          // Lock the hero to a fixed landscape box so a portrait source can't
+          // blow the height out and push the profile down: 3:2 on mobile, 16:9
+          // (1920x1080) on desktop. object-cover crops the source to fit.
+          className="mb-4 block aspect-[3/2] w-full object-cover md:aspect-video"
         />
       ) : null}
       <p className="text-sm uppercase tracking-wider">

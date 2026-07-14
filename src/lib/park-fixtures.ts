@@ -34,6 +34,7 @@ export function buildPark(overrides: Partial<ParkWithRelations> = {}): ParkWithR
     fee: false,
     programming: false,
     ridingSurfaceNotes: null,
+    heroPhotoPath: null,
     ridingSurfacePhotoPath: null,
     statusChangedAt: null,
     reopenExpectedAt: null,

@@ -35,6 +35,7 @@ function makePark(overrides: Partial<ParkWithRelations>): ParkWithRelations {
     fee: false,
     programming: false,
     ridingSurfaceNotes: null,
+    heroPhotoPath: null,
     ridingSurfacePhotoPath: null,
     statusChangedAt: null,
     reopenExpectedAt: null,

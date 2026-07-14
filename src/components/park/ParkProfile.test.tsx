@@ -41,6 +41,7 @@ function makeFullPark(): ParkWithRelations {
     fee: false,
     programming: true, // forces ProgrammingModule to render
     ridingSurfaceNotes: null,
+    heroPhotoPath: null,
     ridingSurfacePhotoPath: null,
     statusChangedAt: null,
     reopenExpectedAt: null,

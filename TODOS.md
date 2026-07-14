@@ -114,6 +114,12 @@ Added 2026-07-07 per owner — these must be resolved before launch. Listed as c
 
 ## P2 — nice to have, defer to post-launch
 
+### Wire hero panorama (parks.hero_photo_path) into the admin photo UI
+**What:** `parks.hero_photo_path` shipped 2026-07-13 (migration `0008_add_hero_photo_path.sql`) so the hero band can show a purpose-shot panorama distinct from the gallery/map thumbnail. `HeroBlock` uses it when set and falls back to the first gallery photo when null. Right now it can only be populated by hand (upload the image to the `photos` bucket, run the Sharp 3-width resize, set the path via seed/SQL), so every park currently renders the fallback.
+**Why:** Gives the hero its own image without the gallery lead and hero being the same photo. Inert until content + an ingest path exist.
+**What's left:** When the admin photo-upload UI is built (same UI that would populate the deferred rules-sign photo — see the held helmet/Park-Rules item in P0), add a "hero panorama" slot that uploads + resizes + sets `hero_photo_path`. No schema work remains; this is purely the ingest surface.
+**Depends on:** An admin park-editing / photo-upload UI (does not exist yet — only `admin/lint` + `admin/login`). Ties into the deferred user/file-upload attack-surface work (P1 "Avatar file upload").
+
 ### Park modal: prev/next park navigation (←/→ inside modal)
 **What:** Inside the park-detail intercept modal, support ←/→ keys (and on-screen prev/next buttons) to browse to the next/previous park without closing the modal. Navigation respects the list's current sort (nearest-by-userLocation, mapCenter, or alphabetical) so the cohort feels coherent.
 **Why:** Deferred from the park-modal CEO review (D3.2). The intercept-route pattern shipped first so we could observe demand before adding nav. Compounds with `mapCenter` sort — a parent scanning parks in the western PA cluster could ←/→ through them without re-opening the list. Matches Zillow/Airbnb pattern.

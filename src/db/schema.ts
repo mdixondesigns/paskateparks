@@ -148,6 +148,11 @@ export const parks = pgTable(
     lng: doublePrecision("lng"),
     hours: text("hours"),
     description: text("description"),
+    // Optional purpose-shot panorama for the hero band. When null, HeroBlock
+    // falls back to the first gallery photo (park_photos[0]) — which is also the
+    // map marker/popup thumbnail. Populated per-park via seed/SQL until an admin
+    // photo-upload UI exists (see TODOS.md). Mirrors ridingSurfacePhotoPath.
+    heroPhotoPath: text("hero_photo_path"),
     allowsSkateboards: boolean("allows_skateboards").notNull().default(true),
     allowsBikes: boolean("allows_bikes").notNull().default(true),
     allowsRollerSkates: boolean("allows_roller_skates").notNull().default(true),

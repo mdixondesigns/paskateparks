@@ -47,6 +47,7 @@ function parkWith(overrides: Partial<ParkWithRelations>): ParkWithRelations {
     statusChangedAt: null,
     reopenExpectedAt: null,
     ridingSurfaceNotes: null,
+    heroPhotoPath: null,
     ridingSurfacePhotoPath: null,
     photos: [],
     amenities: [],
