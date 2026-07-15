@@ -1,9 +1,21 @@
 // Postgres schema for paskateparks.com.
-// Canonical: STACK-PIVOT.md §"Final schema (Postgres)". This file is the source
-// of truth per A7 (plan-eng-review 2026-06-03) — Drizzle Kit generates SQL into
-// supabase/migrations/, applied via `supabase db push` (or drizzle-kit migrate).
+// Canonical DB shape: STACK-PIVOT.md §"Final schema (Postgres)" + the applied
+// SQL in supabase/migrations/. This file is the TYPE source of truth only — the
+// migration files are the DB source of truth.
 //
-// Any schema change goes through this file. Run `pnpm drizzle:generate` after.
+// To change the schema:
+//   1. Hand-write a new SQL migration in supabase/migrations/ (NNNN_name.sql).
+//   2. Update this file to match, so the generated types line up.
+//   3. Apply with `pnpm db:migrate` (has `--dry-run`).
+//
+// Do NOT run `pnpm db:generate` / drizzle-kit generate. Its stored snapshot is
+// stale and emits destructive diffs (tries to recreate `profiles`, re-add
+// `alias`). Migrations here are hand-written, not generated.
+//
+// Ordering matters: local dev connects to the shared PROD DB, and
+// select().from(parks) lists every column declared here — so adding a column to
+// this file before the migration is applied breaks ALL park reads (local + prod)
+// until you run the migration. Apply the migration first, or in the same deploy.
 
 import {
   boolean,
@@ -142,7 +154,8 @@ export const parks = pgTable(
     // for Carl W. Saldutti, etc. Surfaced under the H1 and matched in the
     // homepage search filter so locals can find parks by either name.
     alias: text("alias"),
-    // lat/lng nullable: 99 stub parks don't have coords yet. Render-time:
+    // lat/lng nullable: stub parks may not have coords yet (verified 2026-07-15:
+    // 111 of 159 parks are stubs; only 1 currently lacks coords). Render-time:
     // NULL coords → excluded from /map/ + Nearby compute, profile still renders.
     lat: doublePrecision("lat"),
     lng: doublePrecision("lng"),

@@ -118,9 +118,9 @@ export async function getStaleRevalidate(
 
 /**
  * Parks missing latitude OR longitude. These render at /park/<slug> but are
- * excluded from /map/ and from the Nearby Parks haversine compute. Mostly the
- * 99 stub parks that came over from WP without coords (per F2 migration).
- * Owner-actionable backfill queue.
+ * excluded from /map/ and from the Nearby Parks haversine compute. Stub parks
+ * that came over from WP without coords (per F2 migration); as of 2026-07-15
+ * only 1 park lacks coords. Owner-actionable backfill queue.
  */
 export async function getParksWithoutCoords(db: ResolverDb): Promise<Chip> {
   const rows = await db

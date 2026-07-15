@@ -35,7 +35,7 @@ The mobile mockup screenshots, the live `/park/<slug>/` URL list, and the site-a
 
 This design doc locks **what** to build. Architecture is what's open. Eng review should produce decisions on:
 
-- **Data import pipeline** — WordPress (3 custom post types `park` / `builder` / `shop`, 3 custom taxonomies) → Airtable. One-time bulk import + ongoing content authoring for the 99 stub parks. Lat/lng extraction specifically requires WP DB export, not HTML scraping (see SITE-AUDIT.md §9 #2).
+- **Data import pipeline** — WordPress (3 custom post types `park` / `builder` / `shop`, 3 custom taxonomies) → Airtable. One-time bulk import + ongoing content authoring for the 111 stub parks (verified 2026-07-15). Lat/lng extraction specifically requires WP DB export, not HTML scraping (see SITE-AUDIT.md §9 #2).
 - **Image hosting** — current photos live at `paskateparks.com/wp-content/uploads/`. Migrate to where? Airtable attachments (storage limits)? Cloudinary? S3 + CDN? Phased migration with WP as transitional source?
 - **Airtable → Next.js build pipeline** — ISR with `revalidatePath` triggered by a Vercel deploy hook (per original §Distribution Plan). Confirm Airtable rate-limit handling for the single paginated list call at build time.
 - **Build-time compute** — Haversine for Nearby Parks (3 closest within 30mi) and Nearby Shops (same, no state border rule per D7). Per-park computed values stored in page props.

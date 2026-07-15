@@ -72,16 +72,16 @@ Added 2026-07-07 per owner — these must be resolved before launch. Listed as c
 **Cons:** Requires owner interview + possibly a separate table.
 **Context:** Owner conversation needed before launch. Likely splits into a separate Airtable table from Suggestions (different shape: name of new park + nominator contact vs. correction to existing park).
 
-### Owner workflow for 99 stub parks
-**What:** Define the Airtable view + checklist the owner uses to author the 99 stub parks. Without it, "filled in over time" stays vague forever.
+### Owner workflow for 111 stub parks
+**What:** Give the owner a workflow to author the stub parks. Without it, "filled in over time" stays vague forever.
 **Why:** This is the content debt you migrated, not a v2 thing. Without a workflow, stubs sit blank.
 **Pros:** Owner has a clear path forward post-launch. Visible progress.
 **Cons:** Owner-time intensive.
-**Context:** Suggest an Airtable view named "Stubs to author" filtered by `Description IS EMPTY OR Photos IS EMPTY`, sorted by `Name`. Each row has the schema the owner needs to fill. Add a "% complete" formula field for visibility.
+**Context:** Verified against the prod DB 2026-07-15: **111 of 159 parks (70%) are stubs** (no description AND no photos); 48 parks are filled. (The old "99 stubs" figure was stale and low; the count grew, not shrank.) This entry originally proposed an Airtable "Stubs to author" view — superseded by the in-app CMS decided in the 2026-07-15 CEO review (Approach B). The CMS should surface a "stubs to author" filter (`description IS EMPTY OR no park_photos rows`), sorted by name, with a % complete indicator.
 
 ### Redirect-table maintenance for /park/<slug>/ → /park/<slug>
 **What:** Decide and implement how `next.config.ts`'s `redirects()` block stays in sync as new parks are authored. Options: (a) hardcoded list updated by hand, (b) build-time script `scripts/generate-redirects.ts` reads the `parks` table and emits a generated JSON that `next.config.ts` imports. Recommend (b) for zero-friction stub authoring.
-**Why:** A2 (2026-06-03 plan-eng-review) chose Next.js default no-trailing-slash URLs. WP serves `/park/<slug>/`. Without a 301 redirect for every park slug, every WP-indexed park URL becomes a "new" URL to Google and SEO equity resets. Critical for the 47 currently-live parks; equally critical for the 99 stubs as they're authored.
+**Why:** A2 (2026-06-03 plan-eng-review) chose Next.js default no-trailing-slash URLs. WP serves `/park/<slug>/`. Without a 301 redirect for every park slug, every WP-indexed park URL becomes a "new" URL to Google and SEO equity resets. Critical for the 48 currently-filled parks; equally critical for the 111 stubs as they're authored.
 **Pros:** Auto-generation means stub parks get redirects without owner intervention. SEO equity preserved across the full directory lifecycle.
 **Cons:** Build-time DB read adds ~50ms to `next.config.ts` evaluation. Build script needs the direct Drizzle client (not pooled) — minor wiring.
 **Context:** Tied to A2 (plan-eng-review 2026-06-03). Phase 1 scaffolds the helper; phase 5 migration populates parks; subsequent builds emit correct redirects. Add a test that asserts every `parks.slug` has a corresponding redirect entry at build time.
@@ -99,7 +99,7 @@ Added 2026-07-07 per owner — these must be resolved before launch. Listed as c
 **What:** A row of toggle chips above the search input on `/` for filtering parks by structured facets: amenities (Lit, Indoor, Restrooms, Parking, Free), surface (Concrete, Wood, Asphalt), obstacles/features (Bowl, Vert, Street, Rails). Click toggles; multi-select AND-filters the list. No dropdowns, no facet counts, no clear-all button — chips toggle themselves.
 **Why:** Free-text + distance-sort exist today; the structured facets in `park_obstacles`/`park_amenities`/`park_riding_surfaces` are invisible. A parent asking "where can I take a 7-year-old after dark" (Lit + not-Vert) has no affordance.
 **Pros:** ~80 LOC. All filterable data already in the schema. Reuses the same filter-then-sort pipeline at `HomeParkList.tsx:113`.
-**Cons:** Value compounds with content fill-in — today most parks return on most queries because the 99 stubs lack amenity/obstacle rows. Filtering looks anemic until that content lands.
+**Cons:** Value compounds with content fill-in — today most parks return on most queries because the 111 stubs lack amenity/obstacle rows. Filtering looks anemic until that content lands.
 **Context:** Owner needs to pick the 4-6 chips that matter most for v1 (taste call, not a code call). Probably "Lit", "Bowl", "Indoor", "Free" to start. Look at the existing distance-sort + filter test at `HomeParkList.test.tsx` for the composition pattern to extend.
 **Depends on:** Owner triage of which chips ship.
 
@@ -271,7 +271,7 @@ Added 2026-07-07 per owner — these must be resolved before launch. Listed as c
 
 ### Wherehouse54 (Lancaster) is missing coordinates
 **What:** Geocode Wherehouse54's address and add `lat`/`lng` to its database record.
-**Why:** `pnpm db:check-coords` confirms it's the ONLY park (of 159) in the database currently missing coordinates. It doesn't appear on the map, and as of the 2026-07-06 automatic bbox-filter change, it also doesn't appear in the homepage's synced list (it's still reachable via `/county/lancaster`, relevant `/obstacle/*` archives, and direct URL). Note: TODOS.md's older "Owner workflow for 99 stub parks" entry is stale on this point — the owner has clearly been geocoding stubs over time, and only this one remains.
+**Why:** `pnpm db:check-coords` confirms it's the ONLY park (of 159) in the database currently missing coordinates. It doesn't appear on the map, and as of the 2026-07-06 automatic bbox-filter change, it also doesn't appear in the homepage's synced list (it's still reachable via `/county/lancaster`, relevant `/obstacle/*` archives, and direct URL). Note: the "Owner workflow for 111 stub parks" entry is about content authoring, not coords — the owner has clearly been geocoding stubs over time, and only this one park remains without coords.
 **Pros:** Trivial fix — one address lookup + one DB update — that eliminates the gap at the source instead of requiring ongoing code accommodation.
 **Cons:** Requires confirming the business's actual address and writing to the production database (a live-data change, done deliberately and separately from code changes).
 **Context:** Surfaced by the 2026-07-06 `/plan-eng-review` outside-voice (Codex) pass while reviewing the automatic bbox-filter plan — the plan's original fix assumed ~99 parks lacked coordinates (per the stale entry above) and built more architecture than needed; checking `pnpm db:check-coords` against live data found only this one.
@@ -291,11 +291,11 @@ Added 2026-07-07 per owner — these must be resolved before launch. Listed as c
 
 ### Homepage scaling breakpoint
 **What:** Add a build-time warning in `getAllParksForHomepage()` (src/lib/park-query.ts) when the parks count exceeds 200. At 48 the client-serialized list is ~7KB; at 500 it would be ~75KB and the client-side sort+filter model starts hurting cold-load perf. When the warn fires, switch to either pagination/virtualization or a server-routed sort (`?near=lat,lng` query string with server-side sort).
-**Why:** Owner clarification 2026-05-30: all 150+ parks will have profile pages once the 99 stubs are authored. Without a tripwire, the homepage payload grows silently past the comfortable zone.
+**Why:** Owner clarification 2026-05-30: all 159 parks will have profile pages once the 111 stubs are authored (verified 2026-07-15). Without a tripwire, the homepage payload grows silently past the comfortable zone.
 **Pros:** Prevents silent perf regression. Trivial alert (~5 LOC), no implementation work yet.
 **Cons:** None — measurement only.
 **Context:** Surfaced by `/codex` outside voice during phase 6 plan-eng-review. The check sits in the same query function that already loads the data, so zero new code paths.
-**Depends on:** Owner workflow for 99 stub parks (P1 above) determines when this trips.
+**Depends on:** Owner workflow for 111 stub parks (P1 above) determines when this trips.
 
 ---
 

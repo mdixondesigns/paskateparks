@@ -31,7 +31,7 @@ export interface WithCoords {
 /**
  * Find the top-K nearest items within `maxMiles` of an origin.
  * Items with NULL lat/lng are excluded silently (per STACK-PIVOT.md finding #2 —
- * 99 stub parks don't have coords yet).
+ * stub parks may not have coords yet; 1 currently lacks them as of 2026-07-15).
  * Returns items with a `distanceMiles` field appended, sorted nearest-first.
  */
 function isValidCoord(v: number | null): v is number {
@@ -45,7 +45,7 @@ export function findNearby<T extends WithCoords>(
 ): (T & { distanceMiles: number })[] {
   const results: (T & { distanceMiles: number })[] = [];
   for (const c of candidates) {
-    // Defense in depth: NULL coords are common (99 stub parks per
+    // Defense in depth: NULL coords are allowed for stub parks (per
     // STACK-PIVOT.md finding #2). NaN/Infinity should never reach here —
     // db:check-coords gates against it — but if they did, haversineMiles
     // would produce NaN and the sort would silently misorder. Drop them.

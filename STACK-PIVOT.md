@@ -81,7 +81,8 @@ CREATE TABLE parks (
   county TEXT,
   street_address TEXT,
   zip TEXT,
-  -- Outside-voice finding #2: 99 stub parks don't have lat/lng yet. Owner must be able to save a stub.
+  -- Outside-voice finding #2: stub parks may not have lat/lng yet. Owner must be able to save a stub.
+  -- (Verified 2026-07-15: 111 of 159 parks are stubs; only 1 currently lacks lat/lng.)
   -- Render-time: parks with NULL lat/lng are excluded from /map/ and Nearby Parks/Shops, page still renders.
   lat DOUBLE PRECISION,
   lng DOUBLE PRECISION,
@@ -216,7 +217,7 @@ CREATE POLICY suggestions_insert_valid_park ON suggestions FOR INSERT TO service
 
 ### Schema notes (added after outside-voice review)
 
-- **`parks.lat`/`lng` are NULL-able** (was NOT NULL). Required because 99 stub parks don't have coordinates yet — owner must be able to save a stub. Render code: parks with NULL coords are excluded from /map/ and from Nearby-Parks/Shops haversine, but the profile page itself renders.
+- **`parks.lat`/`lng` are NULL-able** (was NOT NULL). Required because stub parks may not have coordinates yet — owner must be able to save a stub. (Verified 2026-07-15: only 1 of 159 parks currently lacks coords.) Render code: parks with NULL coords are excluded from /map/ and from Nearby-Parks/Shops haversine, but the profile page itself renders.
 - **`park_obstacles.obstacle` is enum, not TEXT.** Prevents typo-driven new obstacles in Studio. Adding a new obstacle = single `ALTER TYPE obstacle_type ADD VALUE` migration.
 - **`builders.name` is UNIQUE.** Prevents duplicate "DIY" silent inserts. Migration script normalizes names (trim, casefold-compare) before insert.
 - **`suggestions.submitter_ip_truncated` is CIDR with /24 truncation** (not raw INET). API route runs `inet '192.168.1.5' & inet '255.255.255.0'` before insert. Keeps abuse-triage signal without storing PII.
@@ -401,7 +402,7 @@ Both dev and prod projects pinged. Failure → GitHub sends email. ~10 seconds, 
 ```
                 ┌──────────────────────────────────────────────┐
                 │              WordPress (sunset)               │
-                │  - 47 parks + 99 stubs                        │
+                │  - 159 parks (48 filled + 111 stubs)          │
                 │  - 14 builders, 20 shops                      │
                 │  - 1500 photos in /wp-content/uploads/        │
                 │  - lat/lng in WP Google Maps plugin tables    │

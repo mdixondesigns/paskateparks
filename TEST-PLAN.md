@@ -6,7 +6,7 @@ Stack locked in D11 + E1-E6: Vitest (unit) + Playwright (E2E) + MSW (Supabase/Tu
 ## Affected pages/routes
 
 - `/` — homepage (list-first per D6) — verify hero, search, near-me button, nearest cards render with geolocation grant/deny
-- `/park/<slug>/` — park profile (all 47 live + 99 stubs as they're authored) — verify all 16 sections render gracefully with rich data and minimal data
+- `/park/<slug>/` — park profile (all 48 filled + 111 stubs as they're authored) — verify all 16 sections render gracefully with rich data and minimal data
 - `/map/` — full Leaflet map page — verify 150+ markers cluster, popovers work, mobile pinch-zoom not locked
 - `/builder/<slug>/` (×14) — must return HTTP 410
 - `/shop/<slug>/` (×20) — must return HTTP 410

@@ -319,7 +319,7 @@ This is the visual logic that makes the whole system cohere. Two distinct divide
 
 ---
 
-## 11. Empty-stub state (the 99-of-150 critical path)
+## 11. Empty-stub state (the 111-of-159 critical path)
 
 99 of 150 parks will launch with minimal data per [DESIGN.md](DESIGN.md) and [SITE-AUDIT.md](docs/archive/SITE-AUDIT.md). The stub state is a P0 visual responsibility.
 

@@ -3,7 +3,7 @@
  * feature. Asserts every NON-NULL park lat/lng pair is finite and in bounds.
  *
  * NULL coordinates are LEGAL in the schema (per STACK-PIVOT.md finding #2 —
- * 99 stub parks don't have coords yet). They're reported in a separate
+ * stub parks may not have coords yet; 1 does as of 2026-07-15). Reported in a separate
  * tally so the owner can see how many stubs remain, but they do NOT fail
  * the check. The homepage filters out rows that would crash the sort via
  * findNearby's null-coord guard (src/lib/nearby.ts).
@@ -72,7 +72,7 @@ async function main() {
 
     for (const park of rows) {
       if (park.lat === null || park.lng === null) {
-        // NULL coords are legal in the schema (99 stub parks per STACK-PIVOT.md).
+        // NULL coords are legal in the schema (stub parks per STACK-PIVOT.md).
         // We count them but don't fail — the homepage filter still works and
         // findNearby drops them defensively. This is a tally for visibility.
         nullCount++;

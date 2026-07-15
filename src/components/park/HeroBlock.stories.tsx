@@ -42,7 +42,7 @@ export const WithAliasAndRenovations: Story = {
   },
 };
 
-// The 99-of-150 stub case per DESIGN.md — no photo, no established year.
+// The 111-of-159 stub case per DESIGN.md — no photo, no established year.
 export const Stub: Story = {
   args: { park: stubPark },
 };

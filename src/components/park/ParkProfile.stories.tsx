@@ -55,7 +55,7 @@ export const RichPark: Story = {
   args: { park: richPark, nearbyParks, nearbyShops },
 };
 
-// The 99-of-150 stub case — most sections should hide silently, per
+// The 111-of-159 stub case — most sections should hide silently, per
 // DESIGN.md's "render gracefully when fields are missing" rule.
 export const StubPark: Story = {
   args: { park: stubPark, nearbyParks: [], nearbyShops: [] },

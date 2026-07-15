@@ -143,7 +143,7 @@ export const richPark = buildPark({
   ],
 });
 
-// A stub park — the 99-of-150 "unfinished content" case per DESIGN.md and
+// A stub park — the 111-of-159 "unfinished content" case per DESIGN.md and
 // VISUAL-DESIGN.md §11. Only the required fields are set.
 export const stubPark = buildPark({
   name: "Ambler Skatepark",
