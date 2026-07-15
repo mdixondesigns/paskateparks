@@ -114,9 +114,15 @@ export function NavLinks() {
           </li>
         );
       })}
+      {/* TEMP launch hide (2026-07, CEO review 2026-07-15): the auth entry point
+          is hidden until Phase 3 gives accounts a purpose — no reason to sign up
+          yet, so we don't advertise a door into an empty room. To restore, swap
+          `hidden` back to `flex`. The session hook still runs but no-ops for
+          signed-out visitors (no auth cookie → no supabase-js import), so this
+          costs the launch audience nothing. */}
       {/* Fixed-width slot: sized to the wider of its two states ("Sign in"
           text vs 32px avatar) so the swap never reflows the nav (4A). */}
-      <li className="flex min-w-14 justify-end">
+      <li className="hidden min-w-14 justify-end">
         {user ? (
           <Link
             href="/account"

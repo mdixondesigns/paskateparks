@@ -87,10 +87,13 @@ test.describe("User accounts — signup, confirm, account, logout", () => {
     await page.reload();
     await expect(page.getByRole("heading", { name: "Renamed Tester" })).toBeVisible();
 
-    // Sign out returns home and the header reverts to "Sign in".
+    // Sign out returns home. The header auth UI is hidden at launch (see the
+    // TEMP note in NavLinks.tsx — no header "Sign in" to assert), so we prove
+    // signed-out via the /account proxy gate redirecting to /login instead.
     await page.getByRole("button", { name: /sign out/i }).click();
     await expect(page).toHaveURL(/\/$/);
-    await expect(page.locator("header nav").getByRole("link", { name: /sign in/i })).toBeVisible();
+    await page.goto("/account");
+    await expect(page).toHaveURL(/\/login$/);
   });
 
   test("confirmation link works in a DIFFERENT browser context (mobile cross-browser case)", async ({
