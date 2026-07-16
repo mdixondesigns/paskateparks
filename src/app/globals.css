@@ -1,5 +1,22 @@
 @import "tailwindcss";
 
+/* Light-only ground per VISUAL-DESIGN.md §"Palette". The design is a committed
+   light cream/ink system — there is no dark theme. Without an explicit root
+   background/text color + color-scheme, the browser's prefers-color-scheme
+   takes over and dark-mode visitors get an undesigned inverted site. This locks
+   every visitor to the intended cream/ink ground regardless of OS setting.
+   ponytail: minimal light-lock only — the full palette (paint accents, pinstripe
+   wood, dark hero moments) lands with the design-implementation pass, not here. */
+:root {
+  color-scheme: light;
+  --cream: #faf6ec;
+  --text: #1b1612;
+}
+body {
+  background-color: var(--cream);
+  color: var(--text);
+}
+
 /* Tailwind v4 Preflight resets interactive controls to cursor: default. Restore
    the pointer cursor site-wide in one place rather than per-button utility
    classes. Disabled controls keep their own cursor (e.g. cursor-not-allowed). */
