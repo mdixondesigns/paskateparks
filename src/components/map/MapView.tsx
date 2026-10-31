@@ -71,10 +71,18 @@ L.Icon.Default.mergeOptions({
 // in a clean light-grey/cream style so pin clusters pop instead of competing
 // with road labels and land-use color. Single subdomain (a.) — modern HTTP/2
 // multiplexes one origin faster than the legacy a/b/c/d shard pattern, and
-// keeps the preconnect <link> in page.tsx pointed at one host. Free tier:
-// up to ~75K mapviews/mo without an API key per CARTO's public basemap
-// policy; closes the P1 OSM-tile-policy TODO from CMT-5.
-const TILE_URL = "https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png";
+// keeps the preconnect <link> in page.tsx pointed at one host. Closes the P1
+// OSM-tile-policy TODO from CMT-5.
+//
+// API key required as of fall 2026 — keyless requests return a watermarked
+// "API KEY REQUIRED" tile (200 OK, so nothing errors; the map just looks
+// broken). Free commercial tier is 1M requests/mo; get a key at
+// https://carto.com/basemaps/apikey. Optional here so tests/Storybook/local
+// dev don't need one — they just get the watermark.
+const CARTO_KEY = process.env.NEXT_PUBLIC_CARTO_BASEMAPS_KEY;
+export const TILE_URL =
+  "https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png" +
+  (CARTO_KEY ? `?key=${encodeURIComponent(CARTO_KEY)}` : "");
 const TILE_ATTRIBUTION =
   '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>';
 const TILE_MAX_ZOOM = 20;
