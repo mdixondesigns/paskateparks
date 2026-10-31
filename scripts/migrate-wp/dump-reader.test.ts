@@ -35,10 +35,7 @@ describe("iterRows — unit", () => {
     // Source string is literally: \\ \' \" \n \r \t \b \0 \Z and one unknown \q
     const input = "(1,'\\\\ \\' \\\" \\n \\r \\t \\b \\0 \\Z \\q')";
     const [row] = [...iterRows(input)];
-    expect(row).toEqual([
-      "1",
-      "\\ ' \" \n \r \t \b \0 \x1A q",
-    ]);
+    expect(row).toEqual(["1", "\\ ' \" \n \r \t \b \0 \x1A q"]);
   });
 
   it("throws on unterminated quoted string", () => {
@@ -48,9 +45,7 @@ describe("iterRows — unit", () => {
 
   it("throws on unexpected non-tuple text between values", () => {
     // After a clean (1,'a') tuple, stray text where the next '(' should be.
-    expect(() => [...iterRows("(1,'a') unexpected garbage (2,'b')")]).toThrow(
-      /expected '\('/,
-    );
+    expect(() => [...iterRows("(1,'a') unexpected garbage (2,'b')")]).toThrow(/expected '\('/);
   });
 
   it("throws on malformed tuple body (missing , or ) after column)", () => {
@@ -72,9 +67,7 @@ describe("iterRows — unit", () => {
   });
 
   it("preserves commas inside quoted strings", () => {
-    expect([...iterRows("(1,'Philadelphia, PA',2)")]).toEqual([
-      ["1", "Philadelphia, PA", "2"],
-    ]);
+    expect([...iterRows("(1,'Philadelphia, PA',2)")]).toEqual([["1", "Philadelphia, PA", "2"]]);
   });
 
   it("preserves parens inside quoted strings", () => {
@@ -82,7 +75,7 @@ describe("iterRows — unit", () => {
   });
 
   it("preserves PHP-serialized strings as opaque blobs", () => {
-    const blob = "a:1:{i:0;s:3:\"256\";}";
+    const blob = 'a:1:{i:0;s:3:"256";}';
     const escaped = blob.replace(/"/g, '\\"');
     const sql = `(1,'${escaped}')`;
     const [row] = [...iterRows(sql)];
@@ -123,8 +116,7 @@ describe("extractTableValues — unit", () => {
     // Codex finding #1: `;\n` lookup used to silently collapse CRLF dumps
     // into one giant blob, then iterRows would explode at the wrong offset.
     const dump =
-      "INSERT INTO `wp_posts` VALUES (1,'a');\r\n" +
-      "INSERT INTO `wp_posts` VALUES (2,'b');\r\n";
+      "INSERT INTO `wp_posts` VALUES (1,'a');\r\n" + "INSERT INTO `wp_posts` VALUES (2,'b');\r\n";
     const blob = extractTableValues(dump, "wp_posts");
     expect([...iterRows(blob)]).toEqual([
       ["1", "a"],

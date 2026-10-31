@@ -25,9 +25,7 @@ describe("truncateIp — IPv4", () => {
 
 describe("truncateIp — IPv6", () => {
   it("truncates an uncompressed IPv6 to /64", () => {
-    expect(truncateIp("2001:0db8:85a3:0000:0000:8a2e:0370:7334")).toBe(
-      "2001:db8:85a3:0::/64",
-    );
+    expect(truncateIp("2001:0db8:85a3:0000:0000:8a2e:0370:7334")).toBe("2001:db8:85a3:0::/64");
   });
   it("handles :: compression at the end", () => {
     expect(truncateIp("2001:db8:85a3::")).toBe("2001:db8:85a3:0::/64");

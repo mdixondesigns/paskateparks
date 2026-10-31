@@ -46,7 +46,7 @@ function GalleryTile({
       aria-label={
         overflowCount ? `Show all ${total} photos` : `View photo ${index + 1} of ${total}`
       }
-      className={`group relative block min-w-0 overflow-hidden focus:outline-none focus:ring-2 focus:ring-black ${className}`}
+      className={`group relative block min-w-0 overflow-hidden focus:ring-2 focus:ring-black focus:outline-none ${className}`}
     >
       <ResponsiveImage
         storagePath={photo.storagePath}

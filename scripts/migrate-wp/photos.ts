@@ -146,9 +146,7 @@ async function processOnePark(
   }
 
   for (const photo of park.photos) {
-    const needed = WIDTHS.filter(
-      (w) => !existingNames.has(fileNameForSize(photo.sortOrder, w)),
-    );
+    const needed = WIDTHS.filter((w) => !existingNames.has(fileNameForSize(photo.sortOrder, w)));
     if (needed.length === 0) {
       result.photosSkipped++;
       result.filesSkipped += WIDTHS.length;

@@ -16,8 +16,7 @@ const API = process.env.SUPABASE_LOCAL_URL ?? "http://127.0.0.1:54321";
 // with: SUPABASE_LOCAL_SECRET_KEY=$(supabase status -o json | jq -r '.SECRET_KEY')
 // (GitHub push protection pattern-matches sb_secret_* literals, and rightly so.)
 const PUBLISHABLE =
-  process.env.SUPABASE_LOCAL_PUBLISHABLE_KEY ??
-  "sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH";
+  process.env.SUPABASE_LOCAL_PUBLISHABLE_KEY ?? "sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH";
 const SECRET = process.env.SUPABASE_LOCAL_SECRET_KEY ?? "";
 
 // Every application table in the public schema (schema.test.ts asserts this
@@ -87,10 +86,7 @@ async function tokenFor(email: string): Promise<string> {
 
 test.describe("RLS audit — publishable key against every public table", () => {
   test.skip(!LOCAL_AUTH, "E2E_LOCAL_AUTH=1 + local Supabase stack required");
-  test.skip(
-    LOCAL_AUTH && !SECRET,
-    "SUPABASE_LOCAL_SECRET_KEY required — see header comment",
-  );
+  test.skip(LOCAL_AUTH && !SECRET, "SUPABASE_LOCAL_SECRET_KEY required — see header comment");
 
   test.beforeEach(({}, testInfo) => {
     testInfo.skip(
@@ -187,7 +183,11 @@ test.describe("RLS audit — publishable key against every public table", () => 
     });
     expect(ins.status).not.toBe(201);
 
-    const del = await rest(`profiles?id=eq.${id}`, { method: "DELETE", token, prefer: "return=representation" });
+    const del = await rest(`profiles?id=eq.${id}`, {
+      method: "DELETE",
+      token,
+      prefer: "return=representation",
+    });
     // No DELETE grant/policy → denied outright or zero rows affected.
     if (del.status === 200) {
       expect(del.json).toEqual([]);

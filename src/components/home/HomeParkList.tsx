@@ -183,18 +183,15 @@ export function HomeParkList({
     }
 
     // Alphabetical (default). First 3 above-the-fold cards get LCP priority.
-    return filtered.map((p, idx) =>
-      toCardItem(p, { priority: idx < ABOVE_FOLD_PRIORITY_COUNT }),
-    );
+    return filtered.map((p, idx) => toCardItem(p, { priority: idx < ABOVE_FOLD_PRIORITY_COUNT }));
   }, [parks, filter, userLocation, mapCenter]);
 
   const countLabel = pluralize(items.length, "park");
-  const status: string =
-    userLocation
-      ? `Showing ${countLabel} nearest to you${filter ? ` matching "${filter}"` : ""}.`
-      : filter
-        ? `Showing ${countLabel} matching "${filter}".`
-        : `Showing ${countLabel}.`;
+  const status: string = userLocation
+    ? `Showing ${countLabel} nearest to you${filter ? ` matching "${filter}"` : ""}.`
+    : filter
+      ? `Showing ${countLabel} matching "${filter}".`
+      : `Showing ${countLabel}.`;
 
   return (
     <section aria-labelledby="park-list-heading" className="px-4 py-4">
@@ -204,7 +201,7 @@ export function HomeParkList({
       <h2
         id="park-list-heading"
         tabIndex={-1}
-        className="text-xs font-bold uppercase tracking-wider"
+        className="text-xs font-bold tracking-wider uppercase"
       >
         {userLocation ? "Nearest to you" : "All Pennsylvania skateparks"}
       </h2>
@@ -247,9 +244,7 @@ export function HomeParkList({
         // copy, regardless of any override prop.
         parks.length === 0 ? (
           (emptyStateOverride ?? (
-            <p className="mt-4 text-sm">
-              No parks available right now. Check back soon.
-            </p>
+            <p className="mt-4 text-sm">No parks available right now. Check back soon.</p>
           ))
         ) : (
           <p className="mt-4 text-sm">

@@ -19,11 +19,7 @@ import { resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { phpUnserialize } from "./php-unserialize";
-import {
-  buildersFromContext,
-  parksFromContext,
-  shopsFromContext,
-} from "./transform";
+import { buildersFromContext, parksFromContext, shopsFromContext } from "./transform";
 import { loadWpContext, type WpContext } from "./wp-context";
 
 const DUMP_PATH = resolve(process.cwd(), "data/wp-export/mysql.sql");
@@ -84,14 +80,44 @@ describe.skipIf(!haveDump)("transform — real-dump integration", () => {
   it("every obstacle on every park is in our 38-value enum", () => {
     ctx ??= loadWpContext(DUMP_PATH);
     const validObstacles = new Set([
-      "grind_box_ledge", "quarter_pipe", "flat_rail", "bank_wedge", "hubba",
-      "manual_pad", "funbox", "hip", "handrail", "curb", "pyramid",
-      "kicker_launch_ramp", "stair", "wallride", "mini_ramp", "spine",
-      "euro_london_gap", "pool_bowl", "extension", "gap", "roll_in",
-      "volcano", "jersey_barrier", "a_frame", "amoeba_pool", "box_jump",
-      "picnic_table", "pole", "rainbow_rail", "escalator", "full_pipe",
-      "cradle_over_vert", "snake_run", "fire_hydrant", "whoop_dee_doo",
-      "foam_pit", "mega_ramp", "pump_track",
+      "grind_box_ledge",
+      "quarter_pipe",
+      "flat_rail",
+      "bank_wedge",
+      "hubba",
+      "manual_pad",
+      "funbox",
+      "hip",
+      "handrail",
+      "curb",
+      "pyramid",
+      "kicker_launch_ramp",
+      "stair",
+      "wallride",
+      "mini_ramp",
+      "spine",
+      "euro_london_gap",
+      "pool_bowl",
+      "extension",
+      "gap",
+      "roll_in",
+      "volcano",
+      "jersey_barrier",
+      "a_frame",
+      "amoeba_pool",
+      "box_jump",
+      "picnic_table",
+      "pole",
+      "rainbow_rail",
+      "escalator",
+      "full_pipe",
+      "cradle_over_vert",
+      "snake_run",
+      "fire_hydrant",
+      "whoop_dee_doo",
+      "foam_pit",
+      "mega_ramp",
+      "pump_track",
     ]);
     for (const p of parksFromContext(ctx)) {
       for (const o of p.obstacles) {
@@ -142,9 +168,7 @@ describe.skipIf(!haveDump)("transform — real-dump integration", () => {
     expect(fdr.photos).toHaveLength(28);
 
     // Renovation: FDR has years_refurbished_0_year = 2022
-    expect(fdr.renovations).toEqual([
-      { year: 2022, notes: null, sortOrder: 0 },
-    ]);
+    expect(fdr.renovations).toEqual([{ year: 2022, notes: null, sortOrder: 0 }]);
 
     // Links — 1 website + 2 IG + 1 FB + 1 GoFundMe
     const linkTypes = fdr.links.map((l) => l.type).sort();
@@ -215,8 +239,7 @@ describe.skipIf(!haveDump)("transform — real-dump integration", () => {
 
 describe("phpUnserialize integration (used heavily by transform)", () => {
   it("decodes a realistic FDR location-style ACF assoc array", () => {
-    const raw =
-      'a:3:{s:7:"address";s:5:"test1";s:3:"lat";d:39.5;s:3:"lng";d:-75.5;}';
+    const raw = 'a:3:{s:7:"address";s:5:"test1";s:3:"lat";d:39.5;s:3:"lng";d:-75.5;}';
     expect(phpUnserialize(raw)).toEqual({
       address: "test1",
       lat: 39.5,

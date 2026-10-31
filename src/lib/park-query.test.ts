@@ -107,9 +107,7 @@ describe("getParksByObstacle — phase 8 D11 filter + JOIN shape (CMT-5A)", () =
 
 describe("getCountiesWithOpenParks — generateStaticParams feed (phase 8)", () => {
   it("filters status='open' so empty-after-close counties are dropped", () => {
-    expect(fnBody("getCountiesWithOpenParks")).toMatch(
-      /eq\(parks\.status,\s*["']open["']\)/,
-    );
+    expect(fnBody("getCountiesWithOpenParks")).toMatch(/eq\(parks\.status,\s*["']open["']\)/);
   });
 
   it("ignores parks with null county", () => {
@@ -123,9 +121,7 @@ describe("getCountiesWithOpenParks — generateStaticParams feed (phase 8)", () 
 
 describe("getObstaclesWithOpenParks — generateStaticParams feed (phase 8)", () => {
   it("filters status='open' on the joined parks side", () => {
-    expect(fnBody("getObstaclesWithOpenParks")).toMatch(
-      /eq\(parks\.status,\s*["']open["']\)/,
-    );
+    expect(fnBody("getObstaclesWithOpenParks")).toMatch(/eq\(parks\.status,\s*["']open["']\)/);
   });
 
   it("uses selectDistinct (one row per obstacle, not per row)", () => {

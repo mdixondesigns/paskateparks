@@ -242,16 +242,16 @@ export async function insertOnePark(
     }
 
     if (payload.ridingSurfaces.length > 0) {
-      await tx.insert(schema.parkRidingSurfaces).values(
-        payload.ridingSurfaces.map((s) => ({ parkId, surface: s })),
-      );
+      await tx
+        .insert(schema.parkRidingSurfaces)
+        .values(payload.ridingSurfaces.map((s) => ({ parkId, surface: s })));
       childCount += payload.ridingSurfaces.length;
     }
 
     if (payload.obstacles.length > 0) {
-      await tx.insert(schema.parkObstacles).values(
-        payload.obstacles.map((o) => ({ parkId, obstacle: o })),
-      );
+      await tx
+        .insert(schema.parkObstacles)
+        .values(payload.obstacles.map((o) => ({ parkId, obstacle: o })));
       childCount += payload.obstacles.length;
     }
 
@@ -325,15 +325,22 @@ export async function insertOnePark(
 /** Quick post-migration sanity check: counts rows per table for visibility. */
 export async function countAllTables(db: DrizzleDB): Promise<Record<string, number>> {
   const tables = [
-    "parks", "park_renovations", "park_riding_surfaces", "park_obstacles",
-    "park_amenities", "park_links", "park_photos", "park_builders",
-    "builders", "shops",
+    "parks",
+    "park_renovations",
+    "park_riding_surfaces",
+    "park_obstacles",
+    "park_amenities",
+    "park_links",
+    "park_photos",
+    "park_builders",
+    "builders",
+    "shops",
   ];
   const counts: Record<string, number> = {};
   for (const t of tables) {
     const result = await db.execute(sqlTag.raw(`SELECT count(*)::int AS n FROM ${t}`));
     // postgres-js returns an array of rows; first row's `n` is the count.
-    const rows = Array.isArray(result) ? result : (result as { rows?: unknown[] }).rows ?? [];
+    const rows = Array.isArray(result) ? result : ((result as { rows?: unknown[] }).rows ?? []);
     const first = rows[0] as { n?: number } | undefined;
     counts[t] = first?.n ?? 0;
   }

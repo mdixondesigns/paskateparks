@@ -40,13 +40,7 @@
 
 import { unserialize } from "php-serialize";
 
-export type PhpValue =
-  | null
-  | boolean
-  | number
-  | string
-  | PhpValue[]
-  | { [key: string]: PhpValue };
+export type PhpValue = null | boolean | number | string | PhpValue[] | { [key: string]: PhpValue };
 
 /** Decode a PHP-serialized string. Throws on malformed input. */
 export function phpUnserialize(input: string): PhpValue {

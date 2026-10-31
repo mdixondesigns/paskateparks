@@ -123,10 +123,7 @@ export function Lightbox({ open, parkName, photos, index, onIndexChange, onClose
         </>
       ) : null}
 
-      <div
-        className="relative flex h-full w-full flex-col"
-        onClick={(e) => e.stopPropagation()}
-      >
+      <div className="relative flex h-full w-full flex-col" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-4 py-3 text-sm">
           <span aria-live="polite" aria-atomic="true">
             {index + 1} of {count}
@@ -135,7 +132,7 @@ export function Lightbox({ open, parkName, photos, index, onIndexChange, onClose
             type="button"
             onClick={onClose}
             aria-label="Close photo viewer"
-            className="px-2 py-1 text-2xl leading-none hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-white"
+            className="px-2 py-1 text-2xl leading-none hover:opacity-80 focus:ring-2 focus:ring-white focus:outline-none"
           >
             ×
           </button>
@@ -151,7 +148,7 @@ export function Lightbox({ open, parkName, photos, index, onIndexChange, onClose
               type="button"
               onClick={goPrev}
               aria-label="Previous photo"
-              className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-black/40 px-3 py-2 text-xl hover:bg-black/60 focus:outline-none focus:ring-2 focus:ring-white"
+              className="absolute top-1/2 left-2 -translate-y-1/2 rounded-full bg-black/40 px-3 py-2 text-xl hover:bg-black/60 focus:ring-2 focus:ring-white focus:outline-none"
             >
               ‹
             </button>
@@ -171,14 +168,14 @@ export function Lightbox({ open, parkName, photos, index, onIndexChange, onClose
               type="button"
               onClick={goNext}
               aria-label="Next photo"
-              className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-black/40 px-3 py-2 text-xl hover:bg-black/60 focus:outline-none focus:ring-2 focus:ring-white"
+              className="absolute top-1/2 right-2 -translate-y-1/2 rounded-full bg-black/40 px-3 py-2 text-xl hover:bg-black/60 focus:ring-2 focus:ring-white focus:outline-none"
             >
               ›
             </button>
           ) : null}
         </div>
 
-        {(current.caption || current.credit) ? (
+        {current.caption || current.credit ? (
           <div className="px-4 py-3 text-sm">
             {current.caption ? <p>{current.caption}</p> : null}
             {current.credit ? (

@@ -44,7 +44,7 @@ async function main() {
   const sql = postgres(url, { max: 1, onnotice: () => {} });
 
   try {
-      const tables = await sql<{ tablename: string }[]>`
+    const tables = await sql<{ tablename: string }[]>`
       SELECT tablename FROM pg_tables
       WHERE schemaname = 'public' AND tablename NOT LIKE '\\_\\_%' ESCAPE '\\'
       ORDER BY tablename

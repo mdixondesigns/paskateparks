@@ -50,10 +50,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
   const presented = Buffer.from(header.slice(BEARER_PREFIX.length), "utf8");
-  if (
-    presented.length !== expectedSecret.length ||
-    !timingSafeEqual(presented, expectedSecret)
-  ) {
+  if (presented.length !== expectedSecret.length || !timingSafeEqual(presented, expectedSecret)) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 

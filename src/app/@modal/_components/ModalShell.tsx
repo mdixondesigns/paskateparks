@@ -123,7 +123,7 @@ export function ModalShell({ parkName, notFound = false, children }: Props) {
           type="button"
           onClick={close}
           aria-label="Close"
-          className="park-modal__close-x absolute right-3 top-3 z-10 hidden h-9 w-9 items-center justify-center rounded-full bg-white text-2xl leading-none shadow lg:flex"
+          className="park-modal__close-x absolute top-3 right-3 z-10 hidden h-9 w-9 items-center justify-center rounded-full bg-white text-2xl leading-none shadow lg:flex"
         >
           ×
         </button>
@@ -131,7 +131,7 @@ export function ModalShell({ parkName, notFound = false, children }: Props) {
           type="button"
           onClick={close}
           aria-label="Back"
-          className="park-modal__back absolute left-3 top-3 z-10 flex h-9 items-center gap-1 rounded-full bg-white px-3 text-sm font-medium shadow lg:hidden"
+          className="park-modal__back absolute top-3 left-3 z-10 flex h-9 items-center gap-1 rounded-full bg-white px-3 text-sm font-medium shadow lg:hidden"
         >
           <span aria-hidden="true">‹</span>
           Back
@@ -143,9 +143,7 @@ export function ModalShell({ parkName, notFound = false, children }: Props) {
               {parkName}
             </span>
             <h2 className="text-xl font-semibold">Park not found</h2>
-            <p className="mt-2 text-sm text-gray-700">
-              That park isn&rsquo;t in our directory.
-            </p>
+            <p className="mt-2 text-sm text-gray-700">That park isn&rsquo;t in our directory.</p>
             <button
               type="button"
               onClick={close}

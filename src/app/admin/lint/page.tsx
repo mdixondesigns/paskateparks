@@ -1,11 +1,7 @@
 import Link from "next/link";
 
 import { dbPooled } from "@/db/pooled";
-import {
-  getAllLintChips,
-  type Chip,
-  type ChipError,
-} from "@/lib/lint-checks";
+import { getAllLintChips, type Chip, type ChipError } from "@/lib/lint-checks";
 
 // Owner-facing data-quality dashboard (phase 9 4A — all 4 chips ship in v1).
 //
@@ -41,8 +37,8 @@ export default async function AdminLintPage() {
       <header style={{ marginBottom: "2rem" }}>
         <h1 style={{ fontSize: "1.75rem", margin: 0 }}>Data lint</h1>
         <p style={{ color: "#666", margin: "0.25rem 0 0", fontSize: "0.875rem" }}>
-          Four data-quality checks. Warnings indicate drift that breaks
-          production if accumulated; info chips are owner-actionable backlogs.
+          Four data-quality checks. Warnings indicate drift that breaks production if accumulated;
+          info chips are owner-actionable backlogs.
         </p>
         {errors.length > 0 ? (
           <p
@@ -57,9 +53,8 @@ export default async function AdminLintPage() {
               color: "#600",
             }}
           >
-            {errors.length} of {results.length} checks failed to run. Likely
-            cause: the Supabase project is paused/throttled. Check the dashboard
-            and retry.
+            {errors.length} of {results.length} checks failed to run. Likely cause: the Supabase
+            project is paused/throttled. Check the dashboard and retry.
           </p>
         ) : null}
       </header>
@@ -101,9 +96,7 @@ function ErrorCard({ error }: { error: ChipError }) {
         </h2>
       </header>
       <div style={{ padding: "1rem", fontFamily: "ui-monospace, monospace", fontSize: "0.8rem" }}>
-        <p style={{ margin: 0, color: "#600", whiteSpace: "pre-wrap" }}>
-          {error.error}
-        </p>
+        <p style={{ margin: 0, color: "#600", whiteSpace: "pre-wrap" }}>{error.error}</p>
       </div>
     </section>
   );
@@ -147,9 +140,7 @@ function ChipCard({ chip }: { chip: Chip }) {
           {chip.description}
         </p>
         {chip.rows.length === 0 ? (
-          <p style={{ margin: 0, color: "#080", fontSize: "0.875rem" }}>
-            ✓ No issues.
-          </p>
+          <p style={{ margin: 0, color: "#080", fontSize: "0.875rem" }}>✓ No issues.</p>
         ) : (
           <ul
             style={{

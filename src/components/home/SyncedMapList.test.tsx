@@ -60,9 +60,39 @@ vi.mock("@/lib/use-map-url-state", () => ({
 import { SyncedMapList } from "./SyncedMapList";
 
 const PARKS: HomeParkRow[] = [
-  { id: 1, slug: "9th-and-poplar", name: "9th and Poplar", alias: null, city: "Philadelphia", state: "PA", lat: 39.96, lng: -75.15, heroPhotoPath: "parks/9th/photo-01" },
-  { id: 2, slug: "bayne-skatepark", name: "Bayne Skatepark", alias: null, city: "Bellevue", state: "PA", lat: 40.5, lng: -80.05, heroPhotoPath: "parks/bayne/photo-01" },
-  { id: 3, slug: "fdr", name: "FDR Skatepark", alias: null, city: "Philadelphia", state: "PA", lat: 39.91, lng: -75.18, heroPhotoPath: "parks/fdr/photo-01" },
+  {
+    id: 1,
+    slug: "9th-and-poplar",
+    name: "9th and Poplar",
+    alias: null,
+    city: "Philadelphia",
+    state: "PA",
+    lat: 39.96,
+    lng: -75.15,
+    heroPhotoPath: "parks/9th/photo-01",
+  },
+  {
+    id: 2,
+    slug: "bayne-skatepark",
+    name: "Bayne Skatepark",
+    alias: null,
+    city: "Bellevue",
+    state: "PA",
+    lat: 40.5,
+    lng: -80.05,
+    heroPhotoPath: "parks/bayne/photo-01",
+  },
+  {
+    id: 3,
+    slug: "fdr",
+    name: "FDR Skatepark",
+    alias: null,
+    city: "Philadelphia",
+    state: "PA",
+    lat: 39.91,
+    lng: -75.18,
+    heroPhotoPath: "parks/fdr/photo-01",
+  },
 ];
 
 describe("SyncedMapList — pathname-driven .card-selected (park-modal phase)", () => {
@@ -110,11 +140,21 @@ describe("SyncedMapList — pathname-driven .card-selected (park-modal phase)", 
 
 // Bounds covering ONLY FDR (39.91, -75.18) — excludes 9th (39.96, just north
 // of the boundary) and Bayne (40.5, near Pittsburgh).
-const PHILLY_ONLY_FDR: MapMoveEnd["bounds"] = { south: 39.85, west: -75.25, north: 39.95, east: -75.1 };
+const PHILLY_ONLY_FDR: MapMoveEnd["bounds"] = {
+  south: 39.85,
+  west: -75.25,
+  north: 39.95,
+  east: -75.1,
+};
 // A second, slightly different bounds that STILL contains only FDR — used to
 // test that a pan which doesn't change the visible-ID set does not trigger
 // the .list-refreshing transition (Finding 2A).
-const PHILLY_ONLY_FDR_SHIFTED: MapMoveEnd["bounds"] = { south: 39.8, west: -75.28, north: 39.93, east: -75.05 };
+const PHILLY_ONLY_FDR_SHIFTED: MapMoveEnd["bounds"] = {
+  south: 39.8,
+  west: -75.28,
+  north: 39.93,
+  east: -75.05,
+};
 // Bounds covering both Philadelphia parks (9th + FDR) but not Bayne.
 const PHILLY_BOTH: MapMoveEnd["bounds"] = { south: 39.8, west: -75.3, north: 40.0, east: -75.0 };
 // Bounds nowhere near PA — yields zero results.
@@ -238,7 +278,12 @@ describe("SyncedMapList — automatic bbox filter (restored 2026-07-06)", () => 
     // covering every PARKS fixture, including Bayne near Pittsburgh).
     // Without this, a regression that broke the reset loop (MapView never
     // re-firing fitBounds) would only be caught by the slower e2e suite.
-    const ALL_PARKS_BOUNDS: MapMoveEnd["bounds"] = { south: 39.0, west: -81.0, north: 41.0, east: -74.0 };
+    const ALL_PARKS_BOUNDS: MapMoveEnd["bounds"] = {
+      south: 39.0,
+      west: -81.0,
+      north: 41.0,
+      east: -74.0,
+    };
     fireMoveEnd(ALL_PARKS_BOUNDS);
 
     expect(screen.getByText("Bayne Skatepark")).toBeInTheDocument();

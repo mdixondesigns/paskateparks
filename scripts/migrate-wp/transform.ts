@@ -95,14 +95,44 @@ const SUPPORT_LABEL_MAP: Record<string, LinkType> = {
 
 // The 38 obstacles in our enum. WP slugs use hyphens; we use underscores.
 const OBSTACLE_SET = new Set<ObstacleType>([
-  "grind_box_ledge", "quarter_pipe", "flat_rail", "bank_wedge", "hubba",
-  "manual_pad", "funbox", "hip", "handrail", "curb", "pyramid",
-  "kicker_launch_ramp", "stair", "wallride", "mini_ramp", "spine",
-  "euro_london_gap", "pool_bowl", "extension", "gap", "roll_in",
-  "volcano", "jersey_barrier", "a_frame", "amoeba_pool", "box_jump",
-  "picnic_table", "pole", "rainbow_rail", "escalator", "full_pipe",
-  "cradle_over_vert", "snake_run", "fire_hydrant", "whoop_dee_doo",
-  "foam_pit", "mega_ramp", "pump_track",
+  "grind_box_ledge",
+  "quarter_pipe",
+  "flat_rail",
+  "bank_wedge",
+  "hubba",
+  "manual_pad",
+  "funbox",
+  "hip",
+  "handrail",
+  "curb",
+  "pyramid",
+  "kicker_launch_ramp",
+  "stair",
+  "wallride",
+  "mini_ramp",
+  "spine",
+  "euro_london_gap",
+  "pool_bowl",
+  "extension",
+  "gap",
+  "roll_in",
+  "volcano",
+  "jersey_barrier",
+  "a_frame",
+  "amoeba_pool",
+  "box_jump",
+  "picnic_table",
+  "pole",
+  "rainbow_rail",
+  "escalator",
+  "full_pipe",
+  "cradle_over_vert",
+  "snake_run",
+  "fire_hydrant",
+  "whoop_dee_doo",
+  "foam_pit",
+  "mega_ramp",
+  "pump_track",
 ]);
 
 // ─── Field coercion helpers ─────────────────────────────────────────────────
@@ -130,7 +160,9 @@ function asNullableStr(value: string | null | undefined): string | null {
 
 function asPhpStringArray(value: PhpValue, context: string): string[] {
   if (!Array.isArray(value)) {
-    throw new Error(`${context}: expected PHP array, got ${typeof value} (${JSON.stringify(value).slice(0, 80)})`);
+    throw new Error(
+      `${context}: expected PHP array, got ${typeof value} (${JSON.stringify(value).slice(0, 80)})`,
+    );
   }
   return value.map((v, i) => {
     if (typeof v !== "string") {
@@ -271,7 +303,9 @@ function transformOnePark(ctx: WpContext, post: WpPost): ParkPayload {
   if (parkTypeRaw) {
     const mapped = PARK_TYPE_MAP[parkTypeRaw];
     if (!mapped) {
-      throw new Error(`park ${post.postName}: unrecognized park_type ${JSON.stringify(parkTypeRaw)}`);
+      throw new Error(
+        `park ${post.postName}: unrecognized park_type ${JSON.stringify(parkTypeRaw)}`,
+      );
     }
     parkType = mapped;
   }
@@ -284,7 +318,9 @@ function transformOnePark(ctx: WpContext, post: WpPost): ParkPayload {
   if (helmetsRaw && helmetsRaw !== "") {
     const mapped = HELMETS_MAP[helmetsRaw];
     if (!mapped) {
-      throw new Error(`park ${post.postName}: unrecognized pads_required ${JSON.stringify(helmetsRaw)}`);
+      throw new Error(
+        `park ${post.postName}: unrecognized pads_required ${JSON.stringify(helmetsRaw)}`,
+      );
     }
     helmets = mapped.helmets;
     if (mapped.pads) otherPadsRequired = true;
@@ -485,11 +521,7 @@ function buildAmenities(meta: Map<string, string | null>): ParkPayload["amenitie
   out.push({
     type: "parking",
     present: parkingType != null && parkingType.toLowerCase() !== "none",
-    notes: composeNotes([
-      parkingType,
-      parkingFee ? "Fee: yes" : null,
-      parkingNotes,
-    ]),
+    notes: composeNotes([parkingType, parkingFee ? "Fee: yes" : null, parkingNotes]),
     photoWpAttachmentId: null,
   });
 

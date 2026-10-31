@@ -20,13 +20,8 @@ export function StatusBanner({ status, reopenExpectedAt }: Props) {
     : "We're keeping this page as a historical record of what was here.";
 
   return (
-    <aside
-      role="alert"
-      aria-live="polite"
-      className="border-y px-4 py-3"
-      data-status={status}
-    >
-      <p className="text-xs font-bold uppercase tracking-wider">{label}</p>
+    <aside role="alert" aria-live="polite" className="border-y px-4 py-3" data-status={status}>
+      <p className="text-xs font-bold tracking-wider uppercase">{label}</p>
       <p className="mt-1 text-sm">{body}</p>
     </aside>
   );

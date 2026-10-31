@@ -16,7 +16,7 @@ export function RidingSurface({ park }: Props) {
 
   return (
     <section aria-labelledby="surface-heading" className="px-4 py-4">
-      <h2 id="surface-heading" className="text-xs font-bold uppercase tracking-wider">
+      <h2 id="surface-heading" className="text-xs font-bold tracking-wider uppercase">
         Riding surface
       </h2>
       {hasSurfaces ? (

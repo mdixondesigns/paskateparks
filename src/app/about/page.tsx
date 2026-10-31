@@ -11,9 +11,8 @@ export default function AboutPage() {
     <main id="main" className="mx-auto max-w-2xl px-4 py-8">
       <h1 className="text-3xl font-bold">About</h1>
       <p className="mt-4">
-        PA Skateparks is a free resource intended to make skateparks more
-        accessible through awareness. It is actively maintained by long time
-        skater and technology guy, Mike Dixon.
+        PA Skateparks is a free resource intended to make skateparks more accessible through
+        awareness. It is actively maintained by long time skater and technology guy, Mike Dixon.
       </p>
       <p className="mt-4">
         Connect with me at{" "}

@@ -46,9 +46,7 @@ describe("RETIRED_SHOP_SLUGS", () => {
 
 describe("no slug appears in both sets", () => {
   it("builder + shop slug sets are disjoint", () => {
-    const overlap = [...RETIRED_BUILDER_SLUGS].filter((s) =>
-      RETIRED_SHOP_SLUGS.has(s),
-    );
+    const overlap = [...RETIRED_BUILDER_SLUGS].filter((s) => RETIRED_SHOP_SLUGS.has(s));
     expect(overlap, `unexpected overlap: ${overlap.join(",")}`).toEqual([]);
   });
 });

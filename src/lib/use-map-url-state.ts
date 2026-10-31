@@ -56,9 +56,9 @@ export interface UseMapUrlStateResult {
  * Pure parser, exported for unit tests. Returns null when any param is
  * missing, NaN, or out-of-bounds.
  */
-export function parseMapUrlState(
-  params: URLSearchParams | { get(key: string): string | null },
-): { view: MapView | null } {
+export function parseMapUrlState(params: URLSearchParams | { get(key: string): string | null }): {
+  view: MapView | null;
+} {
   const lat = parseFloat(params.get("lat") ?? "");
   const lng = parseFloat(params.get("lng") ?? "");
   const zoom = parseFloat(params.get("zoom") ?? "");

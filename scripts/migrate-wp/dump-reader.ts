@@ -105,7 +105,14 @@ export function* iterRows(valuesBlob: string): Generator<(string | null)[]> {
   const skipDelims = () => {
     while (i < n) {
       const c = valuesBlob.charCodeAt(i);
-      if (c === 0x20 || c === 0x09 || c === 0x0a || c === 0x0d || c === 0x2c /* , */ || c === 0x3b /* ; */) {
+      if (
+        c === 0x20 ||
+        c === 0x09 ||
+        c === 0x0a ||
+        c === 0x0d ||
+        c === 0x2c /* , */ ||
+        c === 0x3b /* ; */
+      ) {
         i++;
         continue;
       }
@@ -143,16 +150,36 @@ export function* iterRows(valuesBlob: string): Generator<(string | null)[]> {
           if (c === "\\" && i + 1 < n) {
             const next = valuesBlob[i + 1];
             switch (next) {
-              case "n": out += "\n"; break;
-              case "r": out += "\r"; break;
-              case "t": out += "\t"; break;
-              case "b": out += "\b"; break;
-              case "0": out += "\0"; break;
-              case "Z": out += "\x1A"; break;
-              case "\\": out += "\\"; break;
-              case "'": out += "'"; break;
-              case '"': out += '"'; break;
-              default:  out += next ?? ""; break; // mysqldump pass-through
+              case "n":
+                out += "\n";
+                break;
+              case "r":
+                out += "\r";
+                break;
+              case "t":
+                out += "\t";
+                break;
+              case "b":
+                out += "\b";
+                break;
+              case "0":
+                out += "\0";
+                break;
+              case "Z":
+                out += "\x1A";
+                break;
+              case "\\":
+                out += "\\";
+                break;
+              case "'":
+                out += "'";
+                break;
+              case '"':
+                out += '"';
+                break;
+              default:
+                out += next ?? "";
+                break; // mysqldump pass-through
             }
             i += 2;
             continue;

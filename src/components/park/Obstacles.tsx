@@ -12,13 +12,11 @@ export function Obstacles({ obstacles }: Props) {
 
   // Sort alphabetically by display label so the visual order is consistent
   // across parks regardless of insert order.
-  const sorted = [...obstacles].sort((a, b) =>
-    obstacleLabel[a].localeCompare(obstacleLabel[b]),
-  );
+  const sorted = [...obstacles].sort((a, b) => obstacleLabel[a].localeCompare(obstacleLabel[b]));
 
   return (
     <section aria-labelledby="obstacles-heading" className="px-4 py-4">
-      <h2 id="obstacles-heading" className="text-xs font-bold uppercase tracking-wider">
+      <h2 id="obstacles-heading" className="text-xs font-bold tracking-wider uppercase">
         Obstacles
       </h2>
       <ul role="list" className="mt-2 flex flex-wrap gap-2">

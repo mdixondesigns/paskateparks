@@ -50,7 +50,14 @@ function renderLightbox(overrides: Partial<React.ComponentProps<typeof Lightbox>
 describe("Lightbox", () => {
   it("returns null when index is out of range", () => {
     const { container } = render(
-      <Lightbox open photos={PHOTOS} parkName="x" index={99} onIndexChange={() => {}} onClose={() => {}} />,
+      <Lightbox
+        open
+        photos={PHOTOS}
+        parkName="x"
+        index={99}
+        onIndexChange={() => {}}
+        onClose={() => {}}
+      />,
     );
     expect(container.firstChild).toBeNull();
   });
@@ -157,8 +164,9 @@ describe("Lightbox", () => {
 
   it("touch swipe right (positive dx) goes to previous", () => {
     const { container, onIndexChange } = renderLightbox({ index: 1 });
-    const swipeArea = container.querySelector("[onTouchStart], div.relative.flex.flex-1") as HTMLDivElement
-      ?? container.querySelectorAll("div")[2]!;
+    const swipeArea =
+      (container.querySelector("[onTouchStart], div.relative.flex.flex-1") as HTMLDivElement) ??
+      container.querySelectorAll("div")[2]!;
     fireEvent.touchStart(swipeArea, { touches: [{ clientX: 100, clientY: 200 }] });
     fireEvent.touchEnd(swipeArea, { changedTouches: [{ clientX: 200, clientY: 210 }] });
     expect(onIndexChange).toHaveBeenCalledWith(0);

@@ -33,43 +33,33 @@ export async function getParkBySlug(slug: string) {
   const [park] = await db.select().from(parks).where(eq(parks.slug, slug)).limit(1);
   if (!park) return null;
 
-  const [
-    renovations,
-    surfaceRows,
-    obstacleRows,
-    amenities,
-    links,
-    photos,
-    builderJoins,
-  ] = await Promise.all([
-    db
-      .select()
-      .from(parkRenovations)
-      .where(eq(parkRenovations.parkId, park.id))
-      .orderBy(asc(parkRenovations.sortOrder), asc(parkRenovations.year)),
-    db
-      .select()
-      .from(parkRidingSurfaces)
-      .where(eq(parkRidingSurfaces.parkId, park.id)),
-    db.select().from(parkObstacles).where(eq(parkObstacles.parkId, park.id)),
-    db.select().from(parkAmenities).where(eq(parkAmenities.parkId, park.id)),
-    db
-      .select()
-      .from(parkLinks)
-      .where(eq(parkLinks.parkId, park.id))
-      .orderBy(asc(parkLinks.sortOrder)),
-    db
-      .select()
-      .from(parkPhotos)
-      .where(eq(parkPhotos.parkId, park.id))
-      .orderBy(asc(parkPhotos.sortOrder)),
-    db
-      .select({ builder: builders, sortOrder: parkBuilders.sortOrder })
-      .from(parkBuilders)
-      .innerJoin(builders, eq(builders.id, parkBuilders.builderId))
-      .where(eq(parkBuilders.parkId, park.id))
-      .orderBy(asc(parkBuilders.sortOrder)),
-  ]);
+  const [renovations, surfaceRows, obstacleRows, amenities, links, photos, builderJoins] =
+    await Promise.all([
+      db
+        .select()
+        .from(parkRenovations)
+        .where(eq(parkRenovations.parkId, park.id))
+        .orderBy(asc(parkRenovations.sortOrder), asc(parkRenovations.year)),
+      db.select().from(parkRidingSurfaces).where(eq(parkRidingSurfaces.parkId, park.id)),
+      db.select().from(parkObstacles).where(eq(parkObstacles.parkId, park.id)),
+      db.select().from(parkAmenities).where(eq(parkAmenities.parkId, park.id)),
+      db
+        .select()
+        .from(parkLinks)
+        .where(eq(parkLinks.parkId, park.id))
+        .orderBy(asc(parkLinks.sortOrder)),
+      db
+        .select()
+        .from(parkPhotos)
+        .where(eq(parkPhotos.parkId, park.id))
+        .orderBy(asc(parkPhotos.sortOrder)),
+      db
+        .select({ builder: builders, sortOrder: parkBuilders.sortOrder })
+        .from(parkBuilders)
+        .innerJoin(builders, eq(builders.id, parkBuilders.builderId))
+        .where(eq(parkBuilders.parkId, park.id))
+        .orderBy(asc(parkBuilders.sortOrder)),
+    ]);
 
   return {
     ...park,
@@ -388,9 +378,7 @@ export async function getParksByCounty(displayName: string): Promise<TaxonomyPar
  * filter-by-obstacle stays fast as the obstacle row count grows past the
  * current ~150.
  */
-export async function getParksByObstacle(
-  obstacle: ObstacleType,
-): Promise<TaxonomyParkRow[]> {
+export async function getParksByObstacle(obstacle: ObstacleType): Promise<TaxonomyParkRow[]> {
   const rows = await db
     .select({
       id: parks.id,

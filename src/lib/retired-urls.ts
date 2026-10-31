@@ -72,6 +72,10 @@ export const RETIRED_SHOP_SLUGS: ReadonlySet<string> = new Set([
 export function isRetiredBuilderOrShopPath(pathname: string): boolean {
   // Strip query string and trailing slash for the comparison.
   const cleanPath = pathname.split("?")[0]?.replace(/\/+$/, "") ?? "";
-  return cleanPath.startsWith("/builder/") || cleanPath.startsWith("/shop/")
-    || cleanPath === "/builder" || cleanPath === "/shop";
+  return (
+    cleanPath.startsWith("/builder/") ||
+    cleanPath.startsWith("/shop/") ||
+    cleanPath === "/builder" ||
+    cleanPath === "/shop"
+  );
 }

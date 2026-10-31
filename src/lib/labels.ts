@@ -5,9 +5,7 @@
 //   • helmets   — DESIGN.md D16
 //   • link types — DESIGN.md D21 / D23
 
-import {
-  obstacleType,
-} from "@/db/schema";
+import { obstacleType } from "@/db/schema";
 import type {
   amenityType,
   helmetsPolicy,
@@ -165,9 +163,7 @@ export function obstacleSlug(obstacle: ObstacleType): string {
   return obstacle.replace(/_/g, "-");
 }
 
-const OBSTACLE_SLUG_SET = new Set<string>(
-  obstacleType.enumValues.map((v) => v.replace(/_/g, "-")),
-);
+const OBSTACLE_SLUG_SET = new Set<string>(obstacleType.enumValues.map((v) => v.replace(/_/g, "-")));
 
 export function obstacleForSlug(slug: string): ObstacleType | undefined {
   if (!OBSTACLE_SLUG_SET.has(slug)) return undefined;

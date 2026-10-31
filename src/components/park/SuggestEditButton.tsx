@@ -49,9 +49,7 @@ export function SuggestEditButton({ parkId, parkSlug, parkName }: Props) {
       >
         Know this park? Suggest an edit →
       </button>
-      {open ? (
-        <SuggestEditModal parkId={parkId} parkName={parkName} onClose={close} />
-      ) : null}
+      {open ? <SuggestEditModal parkId={parkId} parkName={parkName} onClose={close} /> : null}
     </section>
   );
 }

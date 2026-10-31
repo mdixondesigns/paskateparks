@@ -28,7 +28,7 @@ export function Overview({ park }: Props) {
 
   return (
     <section aria-labelledby="overview-heading" className="px-4 py-4">
-      <h2 id="overview-heading" className="text-xs font-bold uppercase tracking-wider">
+      <h2 id="overview-heading" className="text-xs font-bold tracking-wider uppercase">
         Overview
       </h2>
       {hasDescription ? (

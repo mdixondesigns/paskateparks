@@ -29,18 +29,9 @@ import postgres from "postgres";
 
 import * as schema from "../src/db/schema";
 
-import {
-  countAllTables,
-  insertBuilders,
-  insertOnePark,
-  insertShops,
-} from "./migrate-wp/insert";
+import { countAllTables, insertBuilders, insertOnePark, insertShops } from "./migrate-wp/insert";
 import { runPhotoPipeline } from "./migrate-wp/photos";
-import {
-  buildersFromContext,
-  parksFromContext,
-  shopsFromContext,
-} from "./migrate-wp/transform";
+import { buildersFromContext, parksFromContext, shopsFromContext } from "./migrate-wp/transform";
 import type { ParkPayload } from "./migrate-wp/types";
 import { loadWpContext } from "./migrate-wp/wp-context";
 
@@ -170,15 +161,21 @@ async function main(): Promise<void> {
       },
     });
     console.log(`      ✓ photo pipeline done in ${Math.round((Date.now() - tPhotos) / 1000)}s`);
-    console.log(`        photos uploaded: ${result.photosUploaded}, skipped: ${result.photosSkipped}`);
-    console.log(`        files uploaded:  ${result.filesUploaded}, skipped: ${result.filesSkipped}`);
+    console.log(
+      `        photos uploaded: ${result.photosUploaded}, skipped: ${result.photosSkipped}`,
+    );
+    console.log(
+      `        files uploaded:  ${result.filesUploaded}, skipped: ${result.filesSkipped}`,
+    );
     if (result.errors.length > 0) {
       console.log(`        ⚠ errors: ${result.errors.length}`);
       for (const e of result.errors.slice(0, 10)) {
         console.log(`          - ${e.parkSlug}#${e.photoSortOrder}: ${e.error}`);
       }
       if (result.errors.length > 10) {
-        console.log(`          … (${result.errors.length - 10} more — re-run --photos-only to retry)`);
+        console.log(
+          `          … (${result.errors.length - 10} more — re-run --photos-only to retry)`,
+        );
       }
     }
   } else {
@@ -227,7 +224,9 @@ async function main(): Promise<void> {
         }
       }
       console.log(`        ✓ DB inserts done in ${Math.round((Date.now() - tDb) / 1000)}s`);
-      console.log(`          parks: ${parksInserted}/${parks.length}, child rows: ${totalChildren}`);
+      console.log(
+        `          parks: ${parksInserted}/${parks.length}, child rows: ${totalChildren}`,
+      );
       if (parkErrors.length > 0) {
         console.log(`          ⚠ ${parkErrors.length} park insert errors:`);
         for (const e of parkErrors.slice(0, 10)) {

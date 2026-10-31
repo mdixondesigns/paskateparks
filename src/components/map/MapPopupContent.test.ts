@@ -74,15 +74,13 @@ describe("buildPopupNode — pure DOM builder (phase 7 plan-eng-review 2A)", () 
   it("XSS-safety: a slug needing URL-encoding is encoded in the href", () => {
     const node = buildPopupNode({ ...FDR, slug: "weird slug/with stuff" });
     const link = node.children[2] as HTMLAnchorElement;
-    expect(link.getAttribute("href")).toBe(
-      "/park/weird%20slug%2Fwith%20stuff",
-    );
+    expect(link.getAttribute("href")).toBe("/park/weird%20slug%2Fwith%20stuff");
   });
 
   it("XSS-safety: a city with HTML-like chars renders as literal text", () => {
     const node = buildPopupNode({
       ...FDR,
-      city: '<img src=x onerror=alert(1)>',
+      city: "<img src=x onerror=alert(1)>",
     });
     const loc = node.children[1] as HTMLElement;
     expect(loc.textContent).toContain("<img");

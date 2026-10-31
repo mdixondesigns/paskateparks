@@ -47,9 +47,7 @@ describe("initialsFrom", () => {
 
 describe("InitialsAvatar", () => {
   it("renders the initials, hidden from the accessibility tree", () => {
-    const { container } = render(
-      <InitialsAvatar userId="abc-123" displayName="Mike Dixon" />,
-    );
+    const { container } = render(<InitialsAvatar userId="abc-123" displayName="Mike Dixon" />);
     expect(screen.queryByText("MD")).toBeInTheDocument();
     expect(container.querySelector("[aria-hidden='true']")).not.toBeNull();
   });

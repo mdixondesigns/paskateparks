@@ -14,7 +14,7 @@ export function ConnectSection({ links }: Props) {
 
   return (
     <section aria-labelledby="connect-heading" className="px-4 py-4">
-      <h2 id="connect-heading" className="text-xs font-bold uppercase tracking-wider">
+      <h2 id="connect-heading" className="text-xs font-bold tracking-wider uppercase">
         Connect
       </h2>
       <ul role="list" className="mt-2 border-y">

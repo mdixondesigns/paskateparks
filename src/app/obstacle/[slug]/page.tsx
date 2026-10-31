@@ -6,10 +6,7 @@ import { JsonLd } from "@/components/seo/JsonLd";
 import { NearbyCard, type NearbyCardItem } from "@/components/park/NearbyCard";
 import { HOME_BREADCRUMB, itemListJsonLd } from "@/lib/json-ld";
 import { obstacleForSlug, obstacleLabel, obstacleSlug } from "@/lib/labels";
-import {
-  getObstaclesWithOpenParks,
-  getParksByObstacle,
-} from "@/lib/park-query";
+import { getObstaclesWithOpenParks, getParksByObstacle } from "@/lib/park-query";
 import { SITE_URL } from "@/lib/site";
 
 interface PageProps {
@@ -39,8 +36,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   // First 3 park names for the description so the snippet shows concrete
   // examples rather than just a count.
   const names = parks.slice(0, 3).map((p) => p.name);
-  const namesText =
-    names.length > 0 ? ` Featured: ${names.join(", ")}.` : "";
+  const namesText = names.length > 0 ? ` Featured: ${names.join(", ")}.` : "";
 
   return {
     title: `${label} Spots — PA Skateparks`,
@@ -65,10 +61,7 @@ export default async function ObstacleArchivePage({ params }: PageProps) {
     `PA skateparks with ${label} obstacles`,
     parks.map((p) => ({ name: p.name, url: `/park/${p.slug}` })),
   );
-  const breadcrumbTrail = [
-    HOME_BREADCRUMB,
-    { name: `${label} Spots`, url: `/obstacle/${slug}` },
-  ];
+  const breadcrumbTrail = [HOME_BREADCRUMB, { name: `${label} Spots`, url: `/obstacle/${slug}` }];
 
   const items: NearbyCardItem[] = parks.map((p) => ({
     name: p.name,

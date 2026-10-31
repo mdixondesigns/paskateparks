@@ -39,9 +39,7 @@ async function main() {
   // DIRECT_URL is the session-mode pooler per Supabase's Drizzle/Prisma convention.
   const url = process.env.DIRECT_URL;
   if (!url) {
-    console.error(
-      "ERROR: DIRECT_URL is not set. Copy .env.example to .env.local and fill it in.",
-    );
+    console.error("ERROR: DIRECT_URL is not set. Copy .env.example to .env.local and fill it in.");
     process.exit(1);
   }
   if (url.includes("[YOUR-")) {
@@ -83,9 +81,7 @@ async function main() {
       return;
     }
 
-    console.log(
-      `${DRY_RUN ? "[dry-run] " : ""}Found ${pending.length} pending migration(s):`,
-    );
+    console.log(`${DRY_RUN ? "[dry-run] " : ""}Found ${pending.length} pending migration(s):`);
     for (const m of pending) console.log(`  • ${m}`);
 
     if (DRY_RUN) {
@@ -103,7 +99,9 @@ async function main() {
         .map((s) => s.trim())
         .filter((s) => s.length > 0);
 
-      console.log(`\n→ Applying ${filename} (${statements.length} statement block${statements.length === 1 ? "" : "s"})…`);
+      console.log(
+        `\n→ Applying ${filename} (${statements.length} statement block${statements.length === 1 ? "" : "s"})…`,
+      );
       const t0 = Date.now();
 
       await sql.begin(async (tx) => {

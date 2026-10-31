@@ -57,22 +57,10 @@ function makePark(overrides: Partial<ParkWithRelations>): ParkWithRelations {
 describe("ParkRules — D15/D16/D17 rendering", () => {
   it("marks all four vehicles allowed by default", () => {
     render(<ParkRules park={makePark({})} />);
-    expect(screen.getByLabelText(/Skateboards allowed/i)).toHaveAttribute(
-      "data-allowed",
-      "true",
-    );
-    expect(screen.getByLabelText(/Bikes allowed/i)).toHaveAttribute(
-      "data-allowed",
-      "true",
-    );
-    expect(screen.getByLabelText(/Roller skates allowed/i)).toHaveAttribute(
-      "data-allowed",
-      "true",
-    );
-    expect(screen.getByLabelText(/Scooters allowed/i)).toHaveAttribute(
-      "data-allowed",
-      "true",
-    );
+    expect(screen.getByLabelText(/Skateboards allowed/i)).toHaveAttribute("data-allowed", "true");
+    expect(screen.getByLabelText(/Bikes allowed/i)).toHaveAttribute("data-allowed", "true");
+    expect(screen.getByLabelText(/Roller skates allowed/i)).toHaveAttribute("data-allowed", "true");
+    expect(screen.getByLabelText(/Scooters allowed/i)).toHaveAttribute("data-allowed", "true");
   });
 
   it("renders a disallowed vehicle with three accessibility signals (label + data attr + line-through class)", () => {

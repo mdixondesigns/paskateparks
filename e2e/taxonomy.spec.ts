@@ -17,9 +17,7 @@ import { expect, test } from "@playwright/test";
 // (with-slash) end at the same destination.
 
 test.describe("County archive — /county/[slug]", () => {
-  test("happy path: /county/bucks renders title, count, and park links", async ({
-    page,
-  }) => {
+  test("happy path: /county/bucks renders title, count, and park links", async ({ page }) => {
     const response = await page.goto("/county/bucks");
     expect(response?.status()).toBe(200);
 
@@ -31,14 +29,10 @@ test.describe("County archive — /county/[slug]", () => {
     await expect(page.getByText(/open skateparks? in Bucks County, Pennsylvania/i)).toBeVisible();
 
     // At least one park link — Bensalem Township Community Park is in the seeded data.
-    await expect(
-      page.locator("a[href^='/park/']").first(),
-    ).toBeVisible();
+    await expect(page.locator("a[href^='/park/']").first()).toBeVisible();
   });
 
-  test("unknown slug returns 404 (dynamicParams=false short-circuit)", async ({
-    page,
-  }) => {
+  test("unknown slug returns 404 (dynamicParams=false short-circuit)", async ({ page }) => {
     const response = await page.goto("/county/foo-bar");
     expect(response?.status()).toBe(404);
   });
@@ -58,10 +52,7 @@ test.describe("County archive — /county/[slug]", () => {
     await expect(page).toHaveTitle(/Skateparks in Bucks County, PA — PA Skateparks/);
 
     const canonical = page.locator("link[rel='canonical']");
-    await expect(canonical).toHaveAttribute(
-      "href",
-      /\/county\/bucks$/,
-    );
+    await expect(canonical).toHaveAttribute("href", /\/county\/bucks$/);
 
     // Two JSON-LD blocks — ItemList + BreadcrumbList
     const ldScripts = page.locator("script[type='application/ld+json']");
@@ -77,9 +68,7 @@ test.describe("County archive — /county/[slug]", () => {
 });
 
 test.describe("Obstacle archive — /obstacle/[slug]", () => {
-  test("happy path: /obstacle/quarter-pipe renders title and park links", async ({
-    page,
-  }) => {
+  test("happy path: /obstacle/quarter-pipe renders title and park links", async ({ page }) => {
     const response = await page.goto("/obstacle/quarter-pipe");
     expect(response?.status()).toBe(200);
 
@@ -112,10 +101,7 @@ test.describe("Obstacle archive — /obstacle/[slug]", () => {
     await expect(page).toHaveTitle(/Quarter Pipe Spots — PA Skateparks/);
 
     const canonical = page.locator("link[rel='canonical']");
-    await expect(canonical).toHaveAttribute(
-      "href",
-      /\/obstacle\/quarter-pipe$/,
-    );
+    await expect(canonical).toHaveAttribute("href", /\/obstacle\/quarter-pipe$/);
 
     const ldScripts = page.locator("script[type='application/ld+json']");
     await expect(ldScripts).toHaveCount(2);
@@ -132,33 +118,25 @@ test.describe("Legacy WP URL 301 chains (T7 + CMT-2A)", () => {
   // Next's built-in trailingSlash strip may add an extra hop in the with-
   // slash variants (see file header).
 
-  test("/regions_and_counties/bucks → /county/bucks (no slash, single hop)", async ({
-    page,
-  }) => {
+  test("/regions_and_counties/bucks → /county/bucks (no slash, single hop)", async ({ page }) => {
     const response = await page.goto("/regions_and_counties/bucks");
     expect(response?.status()).toBe(200);
     expect(page.url()).toMatch(/\/county\/bucks$/);
   });
 
-  test("/regions_and_counties/bucks/ → /county/bucks (with slash, may chain)", async ({
-    page,
-  }) => {
+  test("/regions_and_counties/bucks/ → /county/bucks (with slash, may chain)", async ({ page }) => {
     const response = await page.goto("/regions_and_counties/bucks/");
     expect(response?.status()).toBe(200);
     expect(page.url()).toMatch(/\/county\/bucks$/);
   });
 
-  test("/park_obstacles/quarter-pipe → /obstacle/quarter-pipe (no slash)", async ({
-    page,
-  }) => {
+  test("/park_obstacles/quarter-pipe → /obstacle/quarter-pipe (no slash)", async ({ page }) => {
     const response = await page.goto("/park_obstacles/quarter-pipe");
     expect(response?.status()).toBe(200);
     expect(page.url()).toMatch(/\/obstacle\/quarter-pipe$/);
   });
 
-  test("/park_obstacles/quarter-pipe/ → /obstacle/quarter-pipe (with slash)", async ({
-    page,
-  }) => {
+  test("/park_obstacles/quarter-pipe/ → /obstacle/quarter-pipe (with slash)", async ({ page }) => {
     const response = await page.goto("/park_obstacles/quarter-pipe/");
     expect(response?.status()).toBe(200);
     expect(page.url()).toMatch(/\/obstacle\/quarter-pipe$/);
