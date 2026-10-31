@@ -6,7 +6,7 @@
 # Deliberately NOT here yet:
 #   • `pnpm build` / `pnpm test:e2e` — the build reads parks from Supabase at
 #     build time, and the only Supabase project today is production. Vercel
-#     builds every push anyway. Add these once a separate dev project exists
+#     builds every push anyway. Add these once CI can use the staging project
 #     so CI never holds production credentials.
 
 name: CI
