@@ -13,13 +13,13 @@
 # possible signal that's still observable.
 #
 # Required GitHub Actions secrets (set via repo Settings → Secrets and variables → Actions):
-#   • SUPABASE_HOST_DEV               — e.g. djhuxetdljryleztkdrp.supabase.co
-#   • SUPABASE_PUBLISHABLE_KEY_DEV    — the sb_publishable_… key from .env.local
+#   • SUPABASE_HOST_PROD              — e.g. djhuxetdljryleztkdrp.supabase.co
+#   • SUPABASE_PUBLISHABLE_KEY_PROD   — the sb_publishable_… key from .env.local
 #
-# The *_DEV names are historical: the project labeled "paskateparks-dev"
-# (ref djhuxetdljryleztkdrp) IS production — the live site runs on it. No
-# separate prod project was ever created, so the old ping-prod job (which
-# only ever skipped with a warning) was removed 2026-10.
+# Pings production only (paskateparks-prod, ref djhuxetdljryleztkdrp —
+# labeled "paskateparks-dev" until 2026-10-31, when the secrets were renamed
+# from *_DEV). The staging project isn't pinged: if it pauses, only previews
+# and agent runs wait 10-30s, not real visitors.
 #
 # Failure mode: if the ping fails (DB really down, key rotated, etc.), the
 # workflow run goes red and GitHub emails the repo owner. That's the alerting
@@ -59,11 +59,11 @@ jobs:
     steps:
       - name: Ping Supabase
         env:
-          HOST: ${{ secrets.SUPABASE_HOST_DEV }}
-          KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY_DEV }}
+          HOST: ${{ secrets.SUPABASE_HOST_PROD }}
+          KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY_PROD }}
         run: |
           if [ -z "$HOST" ] || [ -z "$KEY" ]; then
-            echo "::warning::Missing SUPABASE_HOST_DEV or SUPABASE_PUBLISHABLE_KEY_DEV — skipping ping. Configure via repo Settings → Secrets and variables → Actions."
+            echo "::warning::Missing SUPABASE_HOST_PROD or SUPABASE_PUBLISHABLE_KEY_PROD — skipping ping. Configure via repo Settings → Secrets and variables → Actions."
             exit 0
           fi
           # --max-time 30 covers the 10-30s resume-from-pause window.
