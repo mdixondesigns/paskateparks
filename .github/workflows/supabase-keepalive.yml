@@ -21,6 +21,10 @@
 # Failure mode: if either ping fails (DB really down, key rotated, etc.), the
 # workflow run goes red and GitHub emails the repo owner. That's the alerting
 # mechanism — no separate monitoring needed.
+#
+# Self-keepalive: GitHub disables scheduled workflows after 60 days without
+# repo activity (this happened once, 2026-10). The stay-enabled job calls the
+# workflow "enable" API each run, which resets that inactivity timer.
 
 name: Supabase keepalive
 
@@ -32,6 +36,20 @@ on:
   workflow_dispatch:
 
 jobs:
+  stay-enabled:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions:
+      actions: write
+    steps:
+      - name: Re-enable this workflow to reset the 60-day inactivity timer
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api --method PUT \
+            "repos/${{ github.repository }}/actions/workflows/supabase-keepalive.yml/enable"
+          echo "✓ workflow re-enabled"
+
   ping-dev:
     runs-on: ubuntu-latest
     timeout-minutes: 2
