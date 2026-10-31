@@ -5,9 +5,7 @@ import { StatusBanner } from "./StatusBanner";
 
 describe("StatusBanner — D11 conditional rendering", () => {
   it("renders nothing when status is open", () => {
-    const { container } = render(
-      <StatusBanner status="open" reopenExpectedAt={null} />,
-    );
+    const { container } = render(<StatusBanner status="open" reopenExpectedAt={null} />);
     expect(container).toBeEmptyDOMElement();
   });
 

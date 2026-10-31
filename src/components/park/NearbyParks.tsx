@@ -11,10 +11,7 @@ export function NearbyParks({ items }: Props) {
 
   return (
     <section aria-labelledby="nearby-parks-heading" className="px-4 py-4">
-      <h2
-        id="nearby-parks-heading"
-        className="text-xs font-bold uppercase tracking-wider"
-      >
+      <h2 id="nearby-parks-heading" className="text-xs font-bold tracking-wider uppercase">
         Nearby parks
       </h2>
       <ul role="list" className="mt-2 border-y">

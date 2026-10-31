@@ -48,10 +48,7 @@ describe("PhotoGallery", () => {
 
   it("singular 'photo' on count of 1", () => {
     render(<PhotoGallery parkName="Test" photos={[PHOTOS[0]!]} />);
-    expect(screen.getByRole("region")).toHaveAttribute(
-      "aria-label",
-      "Test photo gallery, 1 photo",
-    );
+    expect(screen.getByRole("region")).toHaveAttribute("aria-label", "Test photo gallery, 1 photo");
   });
 
   it("dialog is rendered but closed before any thumbnail click", () => {

@@ -48,8 +48,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
       <main id="main" className="mx-auto max-w-sm px-4 py-16">
         <h1 className="mb-4 text-2xl font-extrabold tracking-tight">Check your email</h1>
         <p className="mb-6 text-base">
-          We sent you a confirmation link. Click it and you&apos;ll be signed in and
-          ready to go.
+          We sent you a confirmation link. Click it and you&apos;ll be signed in and ready to go.
         </p>
         <p className="text-sm text-neutral-600">
           Nothing arriving? Check spam, or{" "}

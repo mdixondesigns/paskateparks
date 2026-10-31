@@ -43,10 +43,7 @@ test.describe("Phase 10 — synced map+list on /", () => {
   test("SSR response is filter-independent — a narrowing URL still returns the full list (D6 SEO bet, bbox is client-only)", async ({
     request,
   }) => {
-    const [fullRes, narrowRes] = await Promise.all([
-      request.get("/"),
-      request.get(EMPTY_AREA_URL),
-    ]);
+    const [fullRes, narrowRes] = await Promise.all([request.get("/"), request.get(EMPTY_AREA_URL)]);
     const fullIds = (await fullRes.text()).match(/data-park-id="\d+"/g) ?? [];
     const narrowIds = (await narrowRes.text()).match(/data-park-id="\d+"/g) ?? [];
     // The bbox filter is 100% client-side, post-hydration — the server has
@@ -192,7 +189,9 @@ test.describe("Phase 10 — synced map+list on /", () => {
     // directly by the accessible alt text MapView renders on the thumbnail
     // image, guaranteeing we click a marker that's actually on-screen.
     await page.goto("/?lat=39.8984981&lng=-75.179744&zoom=15");
-    const marker = page.locator(".leaflet-marker-icon").filter({ has: page.locator('img[alt="FDR"]') });
+    const marker = page
+      .locator(".leaflet-marker-icon")
+      .filter({ has: page.locator('img[alt="FDR"]') });
     await marker.waitFor({ timeout: 10_000 });
     await marker.click({ force: true });
     // .card-selected stays applied while the popup is open (no timer fade).

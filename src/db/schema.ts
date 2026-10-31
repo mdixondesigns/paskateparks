@@ -57,12 +57,7 @@ export const helmetsPolicy = pgEnum("helmets_policy", [
   "required_all_ages",
 ]);
 
-export const ridingSurface = pgEnum("riding_surface", [
-  "concrete",
-  "asphalt",
-  "wood",
-  "other",
-]);
+export const ridingSurface = pgEnum("riding_surface", ["concrete", "asphalt", "wood", "other"]);
 
 export const linkType = pgEnum("link_type", [
   "website",

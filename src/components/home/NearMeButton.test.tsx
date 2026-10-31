@@ -5,7 +5,12 @@ import { NearMeButton } from "./NearMeButton";
 
 // Mocked Geolocation lets us drive the state machine deterministically.
 type Success = (pos: { coords: { latitude: number; longitude: number } }) => void;
-type Failure = (err: { code: number; PERMISSION_DENIED: 1; POSITION_UNAVAILABLE: 2; TIMEOUT: 3 }) => void;
+type Failure = (err: {
+  code: number;
+  PERMISSION_DENIED: 1;
+  POSITION_UNAVAILABLE: 2;
+  TIMEOUT: 3;
+}) => void;
 
 interface MockGeolocation {
   getCurrentPosition: ReturnType<typeof vi.fn>;
@@ -135,7 +140,9 @@ describe("NearMeButton", () => {
     installGeolocation(mock);
     render(<NearMeButton onLocation={vi.fn()} onError={onError} />);
     fireEvent.click(await screen.findByRole("button"));
-    expect(await screen.findByRole("button", { name: /couldn't get location/i })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("button", { name: /couldn't get location/i }),
+    ).toBeInTheDocument();
     expect(onError).toHaveBeenCalledWith("unavailable");
   });
 

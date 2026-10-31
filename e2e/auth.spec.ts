@@ -39,7 +39,9 @@ test.describe("User accounts — signup, confirm, account, logout", () => {
     // Poll the mail trap for the confirmation email; the link targets OUR
     // /auth/confirm route with token_hash (CM6.5 template).
     for (let attempt = 0; attempt < 20; attempt++) {
-      const list = await fetch(`${MAILPIT}/api/v1/search?query=to:${encodeURIComponent(email)}&limit=1`);
+      const list = await fetch(
+        `${MAILPIT}/api/v1/search?query=to:${encodeURIComponent(email)}&limit=1`,
+      );
       const { messages } = (await list.json()) as { messages: Array<{ ID: string }> };
       const id = messages?.[0]?.ID;
       if (id) {

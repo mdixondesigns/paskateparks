@@ -25,9 +25,27 @@ import { NearbyParks } from "./NearbyParks";
 // would mask a layer-1 regression), the first test below fires.
 
 const OPEN_NEARBY: NearbyCardItem[] = [
-  { name: "FDR Skatepark", city: "Philadelphia", state: "PA", href: "/park/fdr", distanceMiles: 2.4 },
-  { name: "9th and Poplar", city: "Philadelphia", state: "PA", href: "/park/9th-and-poplar", distanceMiles: 5.1 },
-  { name: "Bayne Skatepark", city: "Bellevue", state: "PA", href: "/park/bayne-skatepark", distanceMiles: 12.8 },
+  {
+    name: "FDR Skatepark",
+    city: "Philadelphia",
+    state: "PA",
+    href: "/park/fdr",
+    distanceMiles: 2.4,
+  },
+  {
+    name: "9th and Poplar",
+    city: "Philadelphia",
+    state: "PA",
+    href: "/park/9th-and-poplar",
+    distanceMiles: 5.1,
+  },
+  {
+    name: "Bayne Skatepark",
+    city: "Bellevue",
+    state: "PA",
+    href: "/park/bayne-skatepark",
+    distanceMiles: 12.8,
+  },
 ];
 
 describe("NearbyParks — D11 discovery-surface contract", () => {

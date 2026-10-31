@@ -82,10 +82,7 @@ export async function getOrphanCounties(db: ResolverDb): Promise<Chip> {
  * Supabase exhausted its retry budget. Null = never revalidated since the
  * column was added (phase 5 migration default).
  */
-export async function getStaleRevalidate(
-  db: ResolverDb,
-  thresholdDays = 30,
-): Promise<Chip> {
+export async function getStaleRevalidate(db: ResolverDb, thresholdDays = 30): Promise<Chip> {
   const cutoff = new Date(Date.now() - thresholdDays * 24 * 60 * 60 * 1000);
   // Drizzle's `lt` knows parks.lastRevalidatedAt is a typed timestamp column
   // and serializes the Date for postgres-js. A raw `sql\`< ${cutoff}\`` template
@@ -153,9 +150,7 @@ export async function getParksWithoutPhotos(db: ResolverDb): Promise<Chip> {
   const rows = await db
     .select(SUMMARY_COLUMNS)
     .from(parks)
-    .where(
-      sql`NOT EXISTS (SELECT 1 FROM ${parkPhotos} WHERE ${parkPhotos.parkId} = ${parks.id})`,
-    )
+    .where(sql`NOT EXISTS (SELECT 1 FROM ${parkPhotos} WHERE ${parkPhotos.parkId} = ${parks.id})`)
     .orderBy(asc(parks.name));
 
   return {
@@ -190,19 +185,21 @@ export type ChipResult = { ok: true; chip: Chip } | { ok: false; error: ChipErro
  * any that rejected, with the Postgres error message for triage.
  */
 export async function getAllLintChips(db: ResolverDb): Promise<ChipResult[]> {
-  const settled = await Promise.allSettled([
-    ["orphan_counties", "Orphan counties", () => getOrphanCounties(db)] as const,
-    ["stale_revalidate", "Stale revalidate", () => getStaleRevalidate(db)] as const,
-    ["null_coords", "Missing coordinates", () => getParksWithoutCoords(db)] as const,
-    ["no_photos", "No photos", () => getParksWithoutPhotos(db)] as const,
-  ].map(async ([key, title, fn]) => {
-    try {
-      return { key, title, chip: await fn() } as const;
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      throw { key, title, message };
-    }
-  }));
+  const settled = await Promise.allSettled(
+    [
+      ["orphan_counties", "Orphan counties", () => getOrphanCounties(db)] as const,
+      ["stale_revalidate", "Stale revalidate", () => getStaleRevalidate(db)] as const,
+      ["null_coords", "Missing coordinates", () => getParksWithoutCoords(db)] as const,
+      ["no_photos", "No photos", () => getParksWithoutPhotos(db)] as const,
+    ].map(async ([key, title, fn]) => {
+      try {
+        return { key, title, chip: await fn() } as const;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        throw { key, title, message };
+      }
+    }),
+  );
 
   return settled.map((result): ChipResult => {
     if (result.status === "fulfilled") {

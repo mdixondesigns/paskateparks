@@ -119,9 +119,7 @@ describe("NearbyCard", () => {
   it("defaults priority=false to lazy loading (rest of the list)", () => {
     const { container } = render(
       <ul>
-        <NearbyCard
-          item={{ name: "Below the fold", thumbStoragePath: "parks/fdr/photo-01" }}
-        />
+        <NearbyCard item={{ name: "Below the fold", thumbStoragePath: "parks/fdr/photo-01" }} />
       </ul>,
     );
     const img = container.querySelector("img");

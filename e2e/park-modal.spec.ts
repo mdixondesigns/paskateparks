@@ -18,9 +18,7 @@ function isDesktopViewport(viewport: { width: number } | null | undefined): bool
 // href. Used to drive intercept-route clicks consistently across runs even
 // as the list sort changes.
 async function getFirstParkLink(page: import("@playwright/test").Page) {
-  const link = page
-    .locator('[data-park-id] a[href^="/park/"]')
-    .first();
+  const link = page.locator('[data-park-id] a[href^="/park/"]').first();
   await link.waitFor({ state: "visible" });
   const href = await link.getAttribute("href");
   if (!href) throw new Error("first park link has no href");
@@ -163,16 +161,12 @@ test.describe("park-modal — intercepting parallel route", () => {
     const { link, href, parkId } = await getFirstParkLink(page);
     await link.click();
     await page.waitForURL(href);
-    await expect(
-      page.locator(`[data-park-id="${parkId}"].card-selected`),
-    ).toHaveCount(1);
+    await expect(page.locator(`[data-park-id="${parkId}"].card-selected`)).toHaveCount(1);
     // Close → highlight cleared.
     await page.locator("dialog.park-modal").focus();
     await page.keyboard.press("Escape");
     await page.waitForURL("/");
-    await expect(
-      page.locator(`[data-park-id="${parkId}"].card-selected`),
-    ).toHaveCount(0);
+    await expect(page.locator(`[data-park-id="${parkId}"].card-selected`)).toHaveCount(0);
   });
 
   test("map popup link click → modal opens (D6.2 router-aware popup)", async ({
@@ -184,9 +178,7 @@ test.describe("park-modal — intercepting parallel route", () => {
     await expect(page.locator(".leaflet-container")).toHaveCount(1);
     // Zoom in so individual markers don't visually overlap.
     await page.evaluate(() => {
-      const zoomIn = document.querySelector(
-        ".leaflet-control-zoom-in",
-      ) as HTMLAnchorElement | null;
+      const zoomIn = document.querySelector(".leaflet-control-zoom-in") as HTMLAnchorElement | null;
       if (!zoomIn) return;
       for (let i = 0; i < 6; i++) zoomIn.click();
     });
@@ -245,9 +237,7 @@ test.describe("park-modal — intercepting parallel route", () => {
     await expect(page).toHaveTitle(homepageTitle, { timeout: 10_000 });
   });
 
-  test("D5 — router.push('/') fallback fires when window.history.length is 1", async ({
-    page,
-  }) => {
+  test("D5 — router.push('/') fallback fires when window.history.length is 1", async ({ page }) => {
     // The deep-link → / → modal → close scenario from the plan ultimately
     // boils down to "no safe history entry to pop back to → router.push('/')
     // instead of router.back()". The branch is `window.history.length > 1`

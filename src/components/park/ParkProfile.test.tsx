@@ -52,9 +52,7 @@ function makeFullPark(): ParkWithRelations {
     renovations: [],
     surfaces: ["concrete"],
     obstacles: ["quarter_pipe"],
-    amenities: [
-      { parkId: 1, type: "bathroom", present: true, notes: null, photoPath: null },
-    ],
+    amenities: [{ parkId: 1, type: "bathroom", present: true, notes: null, photoPath: null }],
     links: [
       {
         id: 1,
@@ -85,13 +83,12 @@ describe("ParkProfile — 16-section canonical order per DESIGN.md", () => {
     );
 
     // Sections appear in DOM document order; collect their heading ids.
-    const sectionHeadings = Array.from(
-      container.querySelectorAll("[aria-labelledby]"),
-    )
+    const sectionHeadings = Array.from(container.querySelectorAll("[aria-labelledby]"))
       .map((el) => el.getAttribute("aria-labelledby"))
-      .filter((id): id is string =>
-        // Filter to just the per-section aria-labelledby (skip the article's own).
-        id !== "park-name" && id !== null,
+      .filter(
+        (id): id is string =>
+          // Filter to just the per-section aria-labelledby (skip the article's own).
+          id !== "park-name" && id !== null,
       );
 
     // Canonical order. Skipping section IDs that don't have data in this fixture
@@ -114,9 +111,7 @@ describe("ParkProfile — 16-section canonical order per DESIGN.md", () => {
   });
 
   it("hides Nearby Parks/Shops when both are empty", () => {
-    render(
-      <ParkProfile park={makeFullPark()} nearbyParks={[]} nearbyShops={[]} />,
-    );
+    render(<ParkProfile park={makeFullPark()} nearbyParks={[]} nearbyShops={[]} />);
     // queryByRole('heading') would match every section; just check the two specific labels
     // are missing.
     expect(document.getElementById("nearby-parks-heading")).toBeNull();

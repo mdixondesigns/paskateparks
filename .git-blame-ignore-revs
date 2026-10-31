@@ -1,0 +1,4 @@
+# Mechanical commits hidden from `git blame` (GitHub honors this file;
+# locally: git config blame.ignoreRevsFile .git-blame-ignore-revs).
+# style: apply Prettier across the repo
+7d6363b671586cd4160bc7d7aea901881fffd00e

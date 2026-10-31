@@ -12,7 +12,7 @@ export function Builders({ builders }: Props) {
 
   return (
     <section aria-labelledby="builders-heading" className="px-4 py-4">
-      <h2 id="builders-heading" className="text-xs font-bold uppercase tracking-wider">
+      <h2 id="builders-heading" className="text-xs font-bold tracking-wider uppercase">
         Built by
       </h2>
       <p className="mt-2">

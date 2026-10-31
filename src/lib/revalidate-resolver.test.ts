@@ -35,9 +35,7 @@ function fakeDb(opts: {
   return {
     select: vi.fn(() => ({
       from: vi.fn((table: unknown) => ({
-        where: vi.fn(() =>
-          table === parks ? makeResult(parkRows) : makeResult(obstacleRows),
-        ),
+        where: vi.fn(() => (table === parks ? makeResult(parkRows) : makeResult(obstacleRows))),
       })),
     })),
   } as unknown as ResolverDb;
@@ -106,9 +104,7 @@ describe("resolvePaths — parks UPDATE", () => {
       old_record: { id: 1, slug: "old-slug", county: "Bucks", status: "open" },
     };
     const result = await resolvePaths(payload, noDb);
-    expect(result.paths).toEqual(
-      expect.arrayContaining(["/park/new-slug", "/park/old-slug"]),
-    );
+    expect(result.paths).toEqual(expect.arrayContaining(["/park/new-slug", "/park/old-slug"]));
   });
 
   it("revalidates BOTH old and new county on county change", async () => {
@@ -119,9 +115,7 @@ describe("resolvePaths — parks UPDATE", () => {
       old_record: { id: 1, slug: "x", county: "Philadelphia", status: "open" },
     };
     const result = await resolvePaths(payload, noDb);
-    expect(result.paths).toEqual(
-      expect.arrayContaining(["/county/bucks", "/county/philadelphia"]),
-    );
+    expect(result.paths).toEqual(expect.arrayContaining(["/county/bucks", "/county/philadelphia"]));
   });
 
   it("fans out to /obstacle for every tagged obstacle on a status flip", async () => {
@@ -134,12 +128,7 @@ describe("resolvePaths — parks UPDATE", () => {
     };
     const result = await resolvePaths(payload, db);
     expect(result.paths).toEqual(
-      expect.arrayContaining([
-        "/obstacle/quarter-pipe",
-        "/obstacle/flat-rail",
-        "/",
-        "/map",
-      ]),
+      expect.arrayContaining(["/obstacle/quarter-pipe", "/obstacle/flat-rail", "/", "/map"]),
     );
   });
 
@@ -170,12 +159,7 @@ describe("resolvePaths — parks DELETE", () => {
     };
     const result = await resolvePaths(payload, noDb);
     expect(result.paths).toEqual(
-      expect.arrayContaining([
-        "/park/deleted-park",
-        "/county/lancaster",
-        "/",
-        "/map",
-      ]),
+      expect.arrayContaining(["/park/deleted-park", "/county/lancaster", "/", "/map"]),
     );
   });
 

@@ -116,4 +116,3 @@ describe.skipIf(fixture.samples.length === 0)(
     }
   },
 );
-

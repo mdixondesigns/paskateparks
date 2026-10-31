@@ -108,9 +108,7 @@ export function slugForCounty(displayName: string): string | undefined {
 // Tolerates:  null / undefined / empty / whitespace-only (skipped)
 //             case + whitespace differences (normalized before compare)
 // Strict on:  any other non-empty value not in COUNTIES
-export function assertCountiesInData(
-  parkCounties: ReadonlyArray<string | null | undefined>,
-): void {
+export function assertCountiesInData(parkCounties: ReadonlyArray<string | null | undefined>): void {
   const unknown = new Set<string>();
   for (const raw of parkCounties) {
     if (raw == null) continue;
@@ -121,7 +119,10 @@ export function assertCountiesInData(
     }
   }
   if (unknown.size > 0) {
-    const list = [...unknown].sort().map((s) => JSON.stringify(s)).join(", ");
+    const list = [...unknown]
+      .sort()
+      .map((s) => JSON.stringify(s))
+      .join(", ");
     throw new Error(
       `assertCountiesInData: ${unknown.size} parks.county value(s) not in COUNTIES map: ${list}. ` +
         `Add to src/lib/counties.ts or fix the Studio data.`,

@@ -37,12 +37,12 @@ export function HeroBlock({ park }: Props) {
           className="mb-4 block aspect-[3/2] w-full object-cover md:aspect-video"
         />
       ) : null}
-      <p className="text-sm uppercase tracking-wider">
+      <p className="text-sm tracking-wider uppercase">
         {park.city}, {park.state}
       </p>
       <h1 className="mt-1 text-3xl font-bold">{park.name}</h1>
       {park.alias ? (
-        <p className="mt-1 text-sm italic text-neutral-600">Also known as {park.alias}</p>
+        <p className="mt-1 text-sm text-neutral-600 italic">Also known as {park.alias}</p>
       ) : null}
       <div className="mt-2 flex flex-wrap items-baseline gap-3 text-sm">
         {park.establishedYear ? (

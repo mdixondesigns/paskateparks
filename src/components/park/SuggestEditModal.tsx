@@ -117,10 +117,7 @@ export function SuggestEditModal({ parkId, parkName, onClose }: Props) {
       >
         {state === "success" ? (
           <div className="text-center">
-            <h2
-              id="suggest-modal-title"
-              className="mb-2 text-xl font-semibold"
-            >
+            <h2 id="suggest-modal-title" className="mb-2 text-xl font-semibold">
               Thanks!
             </h2>
             <p className="text-sm text-gray-700">
@@ -130,10 +127,7 @@ export function SuggestEditModal({ parkId, parkName, onClose }: Props) {
         ) : (
           <form onSubmit={handleSubmit} noValidate>
             <header className="mb-4 flex items-start justify-between">
-              <h2
-                id="suggest-modal-title"
-                className="text-xl font-semibold"
-              >
+              <h2 id="suggest-modal-title" className="text-xl font-semibold">
                 Suggest an edit
               </h2>
               <button
@@ -163,9 +157,7 @@ export function SuggestEditModal({ parkId, parkName, onClose }: Props) {
                 overflow: "hidden",
               }}
             >
-              <label htmlFor="suggest-referral-source">
-                Where did you hear about this site?
-              </label>
+              <label htmlFor="suggest-referral-source">Where did you hear about this site?</label>
               <input
                 id="suggest-referral-source"
                 name="referralSource"
@@ -177,10 +169,7 @@ export function SuggestEditModal({ parkId, parkName, onClose }: Props) {
             </div>
 
             <div className="mb-3">
-              <label
-                htmlFor="suggest-description"
-                className="mb-1 block text-sm font-medium"
-              >
+              <label htmlFor="suggest-description" className="mb-1 block text-sm font-medium">
                 What should change? <span className="text-red-600">*</span>
               </label>
               <textarea
@@ -196,10 +185,7 @@ export function SuggestEditModal({ parkId, parkName, onClose }: Props) {
             </div>
 
             <div className="mb-3">
-              <label
-                htmlFor="suggest-reason"
-                className="mb-1 block text-sm font-medium"
-              >
+              <label htmlFor="suggest-reason" className="mb-1 block text-sm font-medium">
                 How do you know? <span className="text-gray-500">(optional)</span>
               </label>
               <input
@@ -214,10 +200,7 @@ export function SuggestEditModal({ parkId, parkName, onClose }: Props) {
 
             <div className="mb-3 grid grid-cols-2 gap-3">
               <div>
-                <label
-                  htmlFor="suggest-name"
-                  className="mb-1 block text-sm font-medium"
-                >
+                <label htmlFor="suggest-name" className="mb-1 block text-sm font-medium">
                   Name <span className="text-gray-500">(optional)</span>
                 </label>
                 <input
@@ -230,10 +213,7 @@ export function SuggestEditModal({ parkId, parkName, onClose }: Props) {
                 />
               </div>
               <div>
-                <label
-                  htmlFor="suggest-email"
-                  className="mb-1 block text-sm font-medium"
-                >
+                <label htmlFor="suggest-email" className="mb-1 block text-sm font-medium">
                   Email <span className="text-gray-500">(optional)</span>
                 </label>
                 <input

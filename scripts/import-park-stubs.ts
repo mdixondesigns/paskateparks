@@ -134,7 +134,8 @@ function parseRows(rows: string[][]): { good: ParsedRow[]; problems: ParseProble
     if (canonical) idx[canonical] = i;
   }
 
-  if (idx.name === undefined) throw new Error("CSV missing required column 'name' (or 'Park name')");
+  if (idx.name === undefined)
+    throw new Error("CSV missing required column 'name' (or 'Park name')");
   if (idx.city === undefined) throw new Error("CSV missing required column 'city'");
 
   const good: ParsedRow[] = [];
@@ -157,19 +158,31 @@ function parseRows(rows: string[][]): { good: ParsedRow[]; problems: ParseProble
     const providedSlug = get("slug");
     const slug = providedSlug || deriveSlug(name);
     if (!slug) {
-      problems.push({ rowNum, name, reason: "could not derive a slug (name produced empty kebab-case)" });
+      problems.push({
+        rowNum,
+        name,
+        reason: "could not derive a slug (name produced empty kebab-case)",
+      });
       continue;
     }
     // Normalize "Permanently Closed" → "permanently_closed" so the Google
     // Sheets human-readable status column maps to the enum.
-    const rawStatus = (get("status").toLowerCase().replace(/\s+/g, "_")) || "open";
+    const rawStatus = get("status").toLowerCase().replace(/\s+/g, "_") || "open";
     if (!VALID_STATUSES.has(rawStatus)) {
-      problems.push({ rowNum, name, reason: `invalid status '${rawStatus}' (allowed: ${[...VALID_STATUSES].join(", ")})` });
+      problems.push({
+        rowNum,
+        name,
+        reason: `invalid status '${rawStatus}' (allowed: ${[...VALID_STATUSES].join(", ")})`,
+      });
       continue;
     }
     const rawParkType = get("park_type").toLowerCase();
     if (rawParkType && !VALID_PARK_TYPES.has(rawParkType)) {
-      problems.push({ rowNum, name, reason: `invalid park_type '${rawParkType}' (allowed: ${[...VALID_PARK_TYPES].join(", ")})` });
+      problems.push({
+        rowNum,
+        name,
+        reason: `invalid park_type '${rawParkType}' (allowed: ${[...VALID_PARK_TYPES].join(", ")})`,
+      });
       continue;
     }
     const latStr = get("lat");
@@ -180,11 +193,19 @@ function parseRows(rows: string[][]): { good: ParsedRow[]; problems: ParseProble
       lat = Number(latStr);
       lng = Number(lngStr);
       if (!Number.isFinite(lat) || lat < -90 || lat > 90) {
-        problems.push({ rowNum, name, reason: `lat '${latStr}' is not a finite number in [-90, 90]` });
+        problems.push({
+          rowNum,
+          name,
+          reason: `lat '${latStr}' is not a finite number in [-90, 90]`,
+        });
         continue;
       }
       if (!Number.isFinite(lng) || lng < -180 || lng > 180) {
-        problems.push({ rowNum, name, reason: `lng '${lngStr}' is not a finite number in [-180, 180]` });
+        problems.push({
+          rowNum,
+          name,
+          reason: `lng '${lngStr}' is not a finite number in [-180, 180]`,
+        });
         continue;
       }
     }
@@ -193,7 +214,11 @@ function parseRows(rows: string[][]): { good: ParsedRow[]; problems: ParseProble
     if (yearStr) {
       establishedYear = Number(yearStr);
       if (!Number.isInteger(establishedYear) || establishedYear < 1900 || establishedYear > 2100) {
-        problems.push({ rowNum, name, reason: `established_year '${yearStr}' is not a 4-digit year` });
+        problems.push({
+          rowNum,
+          name,
+          reason: `established_year '${yearStr}' is not a 4-digit year`,
+        });
         continue;
       }
     }
@@ -316,7 +341,10 @@ async function main() {
         // be Saint or Street, and the period disambiguates.
         .replace(/\bst\./g, "street")
         .replace(/[^a-z0-9]+/g, " ")
-        .replace(/\b(skatepark|skate\s*park|skate|park|memorial|community|borough|township|crescent)\b/g, "")
+        .replace(
+          /\b(skatepark|skate\s*park|skate|park|memorial|community|borough|township|crescent)\b/g,
+          "",
+        )
         .replace(/\s+/g, " ")
         .trim();
       return `${n}|${city.toLowerCase().trim()}`;
@@ -374,7 +402,9 @@ async function main() {
     console.log(`No-op (already matches CSV): ${noChange.length}`);
     console.log(`Will UPDATE:                 ${toUpdate.length}`);
     console.log(`Will INSERT:                 ${toInsert.length}`);
-    console.log(`DB rows not in CSV:          ${leftovers.length}  (left alone — review manually if needed)`);
+    console.log(
+      `DB rows not in CSV:          ${leftovers.length}  (left alone — review manually if needed)`,
+    );
 
     // Detect new counties from BOTH inserts and updates that change county.
     const knownCounties = readKnownCounties();
@@ -421,8 +451,16 @@ async function main() {
     // like Philadelphia as a "rename" of the one new insert there.
     const leftoverCityCount = new Map<string, number>();
     const insertCityCount = new Map<string, number>();
-    for (const l of leftovers) leftoverCityCount.set(l.city.toLowerCase(), (leftoverCityCount.get(l.city.toLowerCase()) ?? 0) + 1);
-    for (const r of toInsert) insertCityCount.set(r.city.toLowerCase(), (insertCityCount.get(r.city.toLowerCase()) ?? 0) + 1);
+    for (const l of leftovers)
+      leftoverCityCount.set(
+        l.city.toLowerCase(),
+        (leftoverCityCount.get(l.city.toLowerCase()) ?? 0) + 1,
+      );
+    for (const r of toInsert)
+      insertCityCount.set(
+        r.city.toLowerCase(),
+        (insertCityCount.get(r.city.toLowerCase()) ?? 0) + 1,
+      );
 
     const renameCandidates = leftovers.filter((l) => {
       const c = l.city.toLowerCase();
@@ -430,16 +468,22 @@ async function main() {
     });
 
     if (renameCandidates.length > 0) {
-      console.log(`\nLIKELY RENAMES — DB stub is the only one in its city, and exactly one new INSERT shares that city:`);
+      console.log(
+        `\nLIKELY RENAMES — DB stub is the only one in its city, and exactly one new INSERT shares that city:`,
+      );
       for (const old of renameCandidates) {
         const replacement = toInsert.find((r) => r.city.toLowerCase() === old.city.toLowerCase());
-        console.log(`  ${old.slug.padEnd(40)} "${old.name}"  →  likely replaced by  "${replacement?.name}" (slug "${replacement?.slug}")`);
+        console.log(
+          `  ${old.slug.padEnd(40)} "${old.name}"  →  likely replaced by  "${replacement?.name}" (slug "${replacement?.slug}")`,
+        );
       }
       console.log(`  After --apply, delete these old slugs in Supabase Studio if confirmed.`);
     }
     const otherLeftovers = leftovers.length - renameCandidates.length;
     if (otherLeftovers > 0) {
-      console.log(`\n(${otherLeftovers} other DB rows are not in this CSV — assumed to be parks the CSV doesn't manage; left unchanged.)`);
+      console.log(
+        `\n(${otherLeftovers} other DB rows are not in this CSV — assumed to be parks the CSV doesn't manage; left unchanged.)`,
+      );
     }
 
     if (!apply) {
@@ -498,10 +542,14 @@ async function main() {
     console.log(`\n✓ Updated ${updatedCount} parks.`);
     console.log(`✓ Inserted ${insertedCount} parks.`);
     if (leftovers.length > 0) {
-      console.log(`ℹ ${leftovers.length} DB rows are NOT in this CSV — left unchanged. Review and delete in Studio if any are renames the CSV replaced.`);
+      console.log(
+        `ℹ ${leftovers.length} DB rows are NOT in this CSV — left unchanged. Review and delete in Studio if any are renames the CSV replaced.`,
+      );
     }
     if (newCountyNames.size > 0) {
-      console.log(`Run 'pnpm build' to verify assertCountiesInData passes against the extended counties.ts.`);
+      console.log(
+        `Run 'pnpm build' to verify assertCountiesInData passes against the extended counties.ts.`,
+      );
     }
   } finally {
     await sql.end();

@@ -34,7 +34,7 @@ name: Supabase keepalive
 on:
   schedule:
     # 09:00 UTC = 05:00 EDT / 04:00 EST. Low-traffic window.
-    - cron: '0 9 * * *'
+    - cron: "0 9 * * *"
   # Allow manual run from the GitHub Actions UI for testing.
   workflow_dispatch:
 

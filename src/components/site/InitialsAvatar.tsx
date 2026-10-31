@@ -45,7 +45,7 @@ export function InitialsAvatar({ userId, displayName, size = 32 }: InitialsAvata
   return (
     <span
       aria-hidden="true"
-      className="inline-flex select-none items-center justify-center rounded-full font-bold"
+      className="inline-flex items-center justify-center rounded-full font-bold select-none"
       style={{
         width: size,
         height: size,

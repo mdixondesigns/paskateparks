@@ -91,9 +91,7 @@ describe("ModalShell", () => {
   it("notFound=true renders the inline 'Park not found' UI without children", () => {
     render(<ModalShell parkName="ghost" notFound />);
     expect(screen.getByText("Park not found")).toBeInTheDocument();
-    expect(
-      screen.getByText(/isn.t in our directory/i),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/isn.t in our directory/i)).toBeInTheDocument();
   });
 
   it("backdrop click (target === dialog) closes; inner click does not", () => {

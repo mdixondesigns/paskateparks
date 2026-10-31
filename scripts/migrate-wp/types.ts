@@ -101,8 +101,8 @@ export interface ParkPayload {
   // can Sharp-resize and upload before step 5 inserts the storage_path rows.
   photos: Array<{
     wpAttachmentId: number;
-    wpFilePath: string;       // e.g. "2021/12/FDR_16.jpg" — relative to wp-content/uploads
-    altText: string | null;   // from `_wp_attachment_image_alt`
+    wpFilePath: string; // e.g. "2021/12/FDR_16.jpg" — relative to wp-content/uploads
+    altText: string | null; // from `_wp_attachment_image_alt`
     sortOrder: number;
   }>;
 }

@@ -133,7 +133,14 @@ const { mapInstance, tileLayerInstance, createdMarkers, L } = vi.hoisted(() => {
 // Stub with a vi.fn so individual tests can assert router.push calls.
 const routerPush = vi.fn();
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: routerPush, replace: vi.fn(), back: vi.fn(), forward: vi.fn(), refresh: vi.fn(), prefetch: vi.fn() }),
+  useRouter: () => ({
+    push: routerPush,
+    replace: vi.fn(),
+    back: vi.fn(),
+    forward: vi.fn(),
+    refresh: vi.fn(),
+    prefetch: vi.fn(),
+  }),
 }));
 
 vi.mock("leaflet", () => ({ default: L }));
@@ -155,10 +162,37 @@ vi.mock("leaflet/dist/images/marker-shadow.png", () => ({
 import { MapView, resolveAssetUrl, type MapPark } from "./MapView";
 
 const PA_PARKS: MapPark[] = [
-  { id: 1, slug: "fdr", name: "FDR Skatepark", city: "Philadelphia", state: "PA", lat: 39.91, lng: -75.18, heroPhotoPath: "parks/fdr/photo-00" },
-  { id: 2, slug: "bayne", name: "Bayne Skatepark", city: "Bellevue", state: "PA", lat: 40.5, lng: -80.05, heroPhotoPath: "parks/bayne/photo-00" },
+  {
+    id: 1,
+    slug: "fdr",
+    name: "FDR Skatepark",
+    city: "Philadelphia",
+    state: "PA",
+    lat: 39.91,
+    lng: -75.18,
+    heroPhotoPath: "parks/fdr/photo-00",
+  },
+  {
+    id: 2,
+    slug: "bayne",
+    name: "Bayne Skatepark",
+    city: "Bellevue",
+    state: "PA",
+    lat: 40.5,
+    lng: -80.05,
+    heroPhotoPath: "parks/bayne/photo-00",
+  },
   // Stub park (no photo) — exercises the plain-pin fallback path.
-  { id: 3, slug: "9th-poplar", name: "9th and Poplar", city: "Philadelphia", state: "PA", lat: 39.97, lng: -75.16, heroPhotoPath: null },
+  {
+    id: 3,
+    slug: "9th-poplar",
+    name: "9th and Poplar",
+    city: "Philadelphia",
+    state: "PA",
+    lat: 39.97,
+    lng: -75.16,
+    heroPhotoPath: null,
+  },
 ];
 
 beforeEach(() => {
@@ -295,7 +329,16 @@ describe("MapView — Leaflet init flow", () => {
 
   it("R4 fallback: degenerate single-point bbox → setView at that point + zoom 11 (animate:false)", () => {
     const single: MapPark[] = [
-      { id: 1, slug: "x", name: "X", city: "C", state: "PA", lat: 40.5, lng: -76.0, heroPhotoPath: null },
+      {
+        id: 1,
+        slug: "x",
+        name: "X",
+        city: "C",
+        state: "PA",
+        lat: 40.5,
+        lng: -76.0,
+        heroPhotoPath: null,
+      },
     ];
     render(<MapView parks={single} />);
     expect(mapInstance.setView).toHaveBeenCalledWith([40.5, -76.0], 11, { animate: false });

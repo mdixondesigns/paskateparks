@@ -1,11 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  COUNTIES,
-  assertCountiesInData,
-  countyForSlug,
-  slugForCounty,
-} from "./counties";
+import { COUNTIES, assertCountiesInData, countyForSlug, slugForCounty } from "./counties";
 
 describe("COUNTIES", () => {
   it("contains 50 entries (14 phase-5 counties + 36 stub-importer counties)", () => {
@@ -68,33 +63,25 @@ describe("slugForCounty", () => {
 
 describe("assertCountiesInData (build-time sanity check)", () => {
   it("passes when every county matches the map", () => {
-    expect(() =>
-      assertCountiesInData(["Bucks", "Philadelphia", "Allegheny"]),
-    ).not.toThrow();
+    expect(() => assertCountiesInData(["Bucks", "Philadelphia", "Allegheny"])).not.toThrow();
   });
 
   it("ignores null and empty values (stub parks have null county)", () => {
-    expect(() =>
-      assertCountiesInData([null, "Bucks", "", "  ", undefined]),
-    ).not.toThrow();
+    expect(() => assertCountiesInData([null, "Bucks", "", "  ", undefined])).not.toThrow();
   });
 
   it("tolerates case + whitespace differences", () => {
-    expect(() =>
-      assertCountiesInData(["bucks", "  PHILADELPHIA  ", "york"]),
-    ).not.toThrow();
+    expect(() => assertCountiesInData(["bucks", "  PHILADELPHIA  ", "york"])).not.toThrow();
   });
 
   it("throws when any value is not in the map", () => {
-    expect(() => assertCountiesInData(["Bucks", "Nonexistent"])).toThrow(
-      /Nonexistent/,
-    );
+    expect(() => assertCountiesInData(["Bucks", "Nonexistent"])).toThrow(/Nonexistent/);
   });
 
   it("reports the count of distinct unknowns", () => {
-    expect(() =>
-      assertCountiesInData(["Bucks", "Nonexistent", "Nonexistent", "Bogus"]),
-    ).toThrow(/2 parks\.county value/);
+    expect(() => assertCountiesInData(["Bucks", "Nonexistent", "Nonexistent", "Bogus"])).toThrow(
+      /2 parks\.county value/,
+    );
   });
 
   it("includes every distinct unknown value in the error", () => {

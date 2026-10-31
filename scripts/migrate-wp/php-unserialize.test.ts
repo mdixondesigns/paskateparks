@@ -42,8 +42,7 @@ describe("phpUnserialize", () => {
   });
 
   it("parses an associative array (wpgmza-style location)", () => {
-    const input =
-      'a:3:{s:7:"address";s:7:"123 Foo";s:3:"lat";d:39.5;s:3:"lng";d:-75.5;}';
+    const input = 'a:3:{s:7:"address";s:7:"123 Foo";s:3:"lat";d:39.5;s:3:"lng";d:-75.5;}';
     expect(phpUnserialize(input)).toEqual({
       address: "123 Foo",
       lat: 39.5,

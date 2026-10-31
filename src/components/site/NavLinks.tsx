@@ -6,9 +6,7 @@ import { useEffect, useState } from "react";
 
 import { InitialsAvatar } from "./InitialsAvatar";
 
-const LINKS = [
-  { href: "/about", label: "About" },
-] as const;
+const LINKS = [{ href: "/about", label: "About" }] as const;
 
 function isActive(pathname: string | null, href: string) {
   if (!pathname) return false;
@@ -31,7 +29,9 @@ interface SessionUser {
 // Bundle contract (6A): supabase-js is NOT in this chunk. A cookie-presence
 // check gates a dynamic import, so the signed-out majority on LCP-critical
 // park pages never downloads the auth client.
-function fromSession(session: { user: { id: string; user_metadata?: Record<string, unknown> } } | null): SessionUser | null {
+function fromSession(
+  session: { user: { id: string; user_metadata?: Record<string, unknown> } } | null,
+): SessionUser | null {
   const sessionUser = session?.user;
   if (!sessionUser) return null;
   return {
@@ -107,7 +107,7 @@ export function NavLinks() {
             <Link
               href={href}
               aria-current={active ? "page" : undefined}
-              className="hover:underline focus:underline aria-[current=page]:underline aria-[current=page]:font-semibold"
+              className="hover:underline focus:underline aria-[current=page]:font-semibold aria-[current=page]:underline"
             >
               {label}
             </Link>
@@ -135,7 +135,7 @@ export function NavLinks() {
           <Link
             href="/login"
             aria-current={isActive(pathname, "/login") ? "page" : undefined}
-            className="hover:underline focus:underline aria-[current=page]:underline aria-[current=page]:font-semibold"
+            className="hover:underline focus:underline aria-[current=page]:font-semibold aria-[current=page]:underline"
           >
             Sign in
           </Link>

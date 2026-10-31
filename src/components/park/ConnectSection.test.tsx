@@ -52,18 +52,14 @@ describe("Connect/Support partitioning per D21/D23", () => {
 
   it("ConnectSection hides silently when no matching links", () => {
     const { container } = render(
-      <ConnectSection
-        links={[link({ id: 1, type: "gofundme", url: "https://gofundme.com/x" })]}
-      />,
+      <ConnectSection links={[link({ id: 1, type: "gofundme", url: "https://gofundme.com/x" })]} />,
     );
     expect(container).toBeEmptyDOMElement();
   });
 
   it("SupportSection hides silently when no matching links", () => {
     const { container } = render(
-      <SupportSection
-        links={[link({ id: 1, type: "website", url: "https://x.example" })]}
-      />,
+      <SupportSection links={[link({ id: 1, type: "website", url: "https://x.example" })]} />,
     );
     expect(container).toBeEmptyDOMElement();
   });
@@ -108,8 +104,6 @@ describe("Connect/Support partitioning per D21/D23", () => {
     expect(screen.getByText("@fdrskatepark")).toBeInTheDocument();
     expect(screen.queryByText("Instagram")).not.toBeInTheDocument();
     // ...but the accessible name still announces the platform for screen readers.
-    expect(
-      screen.getByRole("link", { name: /Instagram: @fdrskatepark/i }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Instagram: @fdrskatepark/i })).toBeInTheDocument();
   });
 });

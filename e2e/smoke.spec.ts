@@ -6,15 +6,10 @@ test.describe("Phase 1 scaffold — smoke", () => {
     expect(response?.status()).toBe(200);
     // Hero h1 was removed by user request; branding lives in the SiteHeader
     // wordmark link instead.
-    await expect(
-      page.getByRole("link", { name: /^PA Skateparks$/i }),
-    ).toBeVisible();
+    await expect(page.getByRole("link", { name: /^PA Skateparks$/i })).toBeVisible();
   });
 
-  test("skip-link is reachable via Tab and points to #main (A6)", async ({
-    page,
-    browserName,
-  }) => {
+  test("skip-link is reachable via Tab and points to #main (A6)", async ({ page, browserName }) => {
     // WebKit (Safari, iOS Safari) only includes form controls in the Tab
     // cycle by default — links are skipped unless the user has enabled
     // "Keyboard navigation" in macOS System Settings → Keyboard. That's a

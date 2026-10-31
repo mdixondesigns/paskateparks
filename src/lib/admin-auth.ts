@@ -41,9 +41,7 @@ const encoder = new TextEncoder();
  * Mint a fresh session cookie value. `nowSeconds` is injectable for tests;
  * production callers pass nothing and get Date.now()-based output.
  */
-export async function sign(
-  nowSeconds: number = Math.floor(Date.now() / 1000),
-): Promise<string> {
+export async function sign(nowSeconds: number = Math.floor(Date.now() / 1000)): Promise<string> {
   const expiry = nowSeconds + TTL_SECONDS;
   const mac = await computeHmac(String(expiry));
   return `${expiry}.${mac}`;

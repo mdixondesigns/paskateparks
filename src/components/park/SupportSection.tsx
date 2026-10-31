@@ -14,7 +14,7 @@ export function SupportSection({ links }: Props) {
 
   return (
     <section aria-labelledby="support-heading" className="px-4 py-4">
-      <h2 id="support-heading" className="text-xs font-bold uppercase tracking-wider">
+      <h2 id="support-heading" className="text-xs font-bold tracking-wider uppercase">
         Support this park
       </h2>
       <ul role="list" className="mt-2 border-y">

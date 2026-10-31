@@ -72,8 +72,7 @@ async function main() {
           fee: false,
           // Tests the Programming dark band per D27 / VISUAL-DESIGN.md §12.
           programming: true,
-          ridingSurfaceNotes:
-            "Mostly concrete with some asphalt transitions at the eastern edge.",
+          ridingSurfaceNotes: "Mostly concrete with some asphalt transitions at the eastern edge.",
         })
         .returning();
 
@@ -116,16 +115,14 @@ async function main() {
           parkId: park.id,
           type: "bathroom",
           present: false,
-          notes:
-            "Nearest public bathroom is about 6 blocks north at the FDR Park visitor center.",
+          notes: "Nearest public bathroom is about 6 blocks north at the FDR Park visitor center.",
         },
         { parkId: park.id, type: "drinking_water", present: false },
         {
           parkId: park.id,
           type: "parking",
           present: true,
-          notes:
-            "Free street parking on Pattison Ave; FDR Park lot is a 5-minute walk.",
+          notes: "Free street parking on Pattison Ave; FDR Park lot is a 5-minute walk.",
         },
         {
           parkId: park.id,

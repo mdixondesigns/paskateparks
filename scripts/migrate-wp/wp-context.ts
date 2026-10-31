@@ -29,10 +29,10 @@ export interface WpPost {
   id: number;
   postContent: string;
   postTitle: string;
-  postStatus: string;   // 'publish' | 'draft' | 'inherit' | ...
-  postName: string;     // slug
-  postType: string;     // 'park' | 'builder' | 'shop' | 'attachment' | ...
-  guid: string;         // useful for attachments (sometimes contains the upload URL)
+  postStatus: string; // 'publish' | 'draft' | 'inherit' | ...
+  postName: string; // slug
+  postType: string; // 'park' | 'builder' | 'shop' | 'attachment' | ...
+  guid: string; // useful for attachments (sometimes contains the upload URL)
 }
 
 export interface WpMeta {
@@ -54,14 +54,14 @@ export interface WpTermTaxonomy {
 }
 
 export interface WpTermRelationship {
-  objectId: number;        // post_id
+  objectId: number; // post_id
   termTaxonomyId: number;
 }
 
 export interface WpgmzaMarker {
   id: number;
   address: string;
-  lat: string;             // varchar in source; convert to number at use site
+  lat: string; // varchar in source; convert to number at use site
   lng: string;
   title: string;
 }
@@ -93,7 +93,8 @@ export interface WpContext {
 function toInt(value: string | null, context: string): number {
   if (value == null) throw new Error(`${context}: expected integer, got NULL`);
   const n = Number(value);
-  if (!Number.isInteger(n)) throw new Error(`${context}: expected integer, got ${JSON.stringify(value)}`);
+  if (!Number.isInteger(n))
+    throw new Error(`${context}: expected integer, got ${JSON.stringify(value)}`);
   return n;
 }
 

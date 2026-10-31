@@ -102,8 +102,7 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
           role="alert"
           className="mb-4 rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800"
         >
-          We couldn&apos;t save that — your session may have expired. Try signing in
-          again.
+          We couldn&apos;t save that — your session may have expired. Try signing in again.
         </p>
       ) : null}
       {params.saved ? (

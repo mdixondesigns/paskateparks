@@ -25,13 +25,8 @@ test.describe("Phase 9 — middleware 410 Gone for retired URLs", () => {
     test(`/builder/${slug} returns 410 with body`, async ({ page }) => {
       const response = await page.goto(`/builder/${slug}`);
       expect(response?.status()).toBe(410);
-      await expect(
-        page.getByRole("heading", { name: /permanently gone/i }),
-      ).toBeVisible();
-      await expect(page.getByRole("link", { name: /browse parks/i })).toHaveAttribute(
-        "href",
-        "/",
-      );
+      await expect(page.getByRole("heading", { name: /permanently gone/i })).toBeVisible();
+      await expect(page.getByRole("link", { name: /browse parks/i })).toHaveAttribute("href", "/");
       await expect(page.getByRole("link", { name: /open the map/i })).toHaveAttribute(
         "href",
         "/map",
@@ -43,9 +38,7 @@ test.describe("Phase 9 — middleware 410 Gone for retired URLs", () => {
     test(`/shop/${slug} returns 410 with body`, async ({ page }) => {
       const response = await page.goto(`/shop/${slug}`);
       expect(response?.status()).toBe(410);
-      await expect(
-        page.getByRole("heading", { name: /permanently gone/i }),
-      ).toBeVisible();
+      await expect(page.getByRole("heading", { name: /permanently gone/i })).toBeVisible();
     });
   }
 
@@ -85,16 +78,12 @@ test.describe("Phase 9 — middleware does NOT intercept other paths", () => {
     expect(response?.status()).toBe(200);
   });
 
-  test("/county/<slug> still resolves normally (phase 8 regression guard)", async ({
-    page,
-  }) => {
+  test("/county/<slug> still resolves normally (phase 8 regression guard)", async ({ page }) => {
     const response = await page.goto("/county/philadelphia");
     expect(response?.status()).toBe(200);
   });
 
-  test("/obstacle/<slug> still resolves normally (phase 8 regression guard)", async ({
-    page,
-  }) => {
+  test("/obstacle/<slug> still resolves normally (phase 8 regression guard)", async ({ page }) => {
     const response = await page.goto("/obstacle/quarter-pipe");
     expect(response?.status()).toBe(200);
   });
@@ -116,9 +105,7 @@ test.describe("Phase 9 — /admin/* auth gate", () => {
     await expect(page.getByRole("button", { name: /sign in/i })).toBeVisible();
   });
 
-  test("/admin/login with wrong password shows the error message", async ({
-    page,
-  }) => {
+  test("/admin/login with wrong password shows the error message", async ({ page }) => {
     await page.goto("/admin/login");
     await page.getByLabel(/password/i).fill("definitely-wrong");
     await page.getByRole("button", { name: /sign in/i }).click();
@@ -130,9 +117,7 @@ test.describe("Phase 9 — /admin/* auth gate", () => {
   // glitch surfaced the missing coverage. The chain is sign() in the server
   // action, Set-Cookie on the 303, browser stores it, follows the redirect
   // to /admin/lint, proxy.ts middleware calls verify(), accepts, page renders.
-  test("/admin/login with right password lands on /admin/lint", async ({
-    page,
-  }, testInfo) => {
+  test("/admin/login with right password lands on /admin/lint", async ({ page }, testInfo) => {
     // Login flow is browser-agnostic (HTML form + middleware HMAC verify, no
     // browser-specific JS). Running on all 3 projects in parallel against
     // pnpm dev causes Turbopack compile contention that pushes any single

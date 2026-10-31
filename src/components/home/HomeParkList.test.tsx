@@ -25,11 +25,61 @@ afterEach(() => {
 
 const PARKS: HomeParkRow[] = [
   // alpha order: 9th, Bayne, FDR, Granahan, Wallenpaupack
-  { id: 1, slug: "9th-and-poplar", name: "9th and Poplar", alias: null, city: "Philadelphia", state: "PA", lat: 39.96, lng: -75.15, heroPhotoPath: "parks/9th/photo-01" },
-  { id: 2, slug: "bayne-skatepark", name: "Bayne Skatepark", alias: "Bellevue Skate Plaza", city: "Bellevue", state: "PA", lat: 40.5, lng: -80.05, heroPhotoPath: "parks/bayne/photo-01" },
-  { id: 3, slug: "fdr", name: "FDR Skatepark", alias: null, city: "Philadelphia", state: "PA", lat: 39.91, lng: -75.18, heroPhotoPath: "parks/fdr/photo-01" },
-  { id: 4, slug: "granahan", name: "Granahan", alias: null, city: "Philadelphia", state: "PA", lat: 39.97, lng: -75.21, heroPhotoPath: null },
-  { id: 5, slug: "wallenpaupack-skatepark", name: "Wallenpaupack Skatepark", alias: null, city: "Hawley", state: "PA", lat: 41.47, lng: -75.18, heroPhotoPath: null },
+  {
+    id: 1,
+    slug: "9th-and-poplar",
+    name: "9th and Poplar",
+    alias: null,
+    city: "Philadelphia",
+    state: "PA",
+    lat: 39.96,
+    lng: -75.15,
+    heroPhotoPath: "parks/9th/photo-01",
+  },
+  {
+    id: 2,
+    slug: "bayne-skatepark",
+    name: "Bayne Skatepark",
+    alias: "Bellevue Skate Plaza",
+    city: "Bellevue",
+    state: "PA",
+    lat: 40.5,
+    lng: -80.05,
+    heroPhotoPath: "parks/bayne/photo-01",
+  },
+  {
+    id: 3,
+    slug: "fdr",
+    name: "FDR Skatepark",
+    alias: null,
+    city: "Philadelphia",
+    state: "PA",
+    lat: 39.91,
+    lng: -75.18,
+    heroPhotoPath: "parks/fdr/photo-01",
+  },
+  {
+    id: 4,
+    slug: "granahan",
+    name: "Granahan",
+    alias: null,
+    city: "Philadelphia",
+    state: "PA",
+    lat: 39.97,
+    lng: -75.21,
+    heroPhotoPath: null,
+  },
+  {
+    id: 5,
+    slug: "wallenpaupack-skatepark",
+    name: "Wallenpaupack Skatepark",
+    alias: null,
+    city: "Hawley",
+    state: "PA",
+    lat: 41.47,
+    lng: -75.18,
+    heroPhotoPath: null,
+  },
 ];
 
 const PHILLY = { lat: 39.9526, lng: -75.1652 }; // City Hall
@@ -161,24 +211,18 @@ describe("HomeParkList", () => {
   describe("mapCenter sort (Plan A — no bbox filter, just reorder)", () => {
     it("sorts by distance from map center when userLocation is null", () => {
       // Map centered on Pittsburgh — Bayne (Bellevue) should come first.
-      render(
-        <HomeParkList parks={PARKS} mapCenter={{ lat: 40.45, lng: -80.0 }} />,
-      );
+      render(<HomeParkList parks={PARKS} mapCenter={{ lat: 40.45, lng: -80.0 }} />);
       const items = screen.getAllByRole("listitem");
       expect(items[0]?.textContent).toContain("Bayne Skatepark");
     });
 
     it("suppresses distance pills (pan would churn them — too noisy)", () => {
-      render(
-        <HomeParkList parks={PARKS} mapCenter={{ lat: 40.45, lng: -80.0 }} />,
-      );
+      render(<HomeParkList parks={PARKS} mapCenter={{ lat: 40.45, lng: -80.0 }} />);
       expect(screen.queryByText(/\d+\.\d+ mi$/)).not.toBeInTheDocument();
     });
 
     it("does NOT change the heading (heading swap is reserved for explicit user-location grant)", () => {
-      render(
-        <HomeParkList parks={PARKS} mapCenter={{ lat: 40.45, lng: -80.0 }} />,
-      );
+      render(<HomeParkList parks={PARKS} mapCenter={{ lat: 40.45, lng: -80.0 }} />);
       expect(
         screen.getByRole("heading", { name: /all pennsylvania skateparks/i }),
       ).toBeInTheDocument();
@@ -187,11 +231,7 @@ describe("HomeParkList", () => {
     it("userLocation wins over mapCenter (user proximity is the stronger intent)", () => {
       // Map at Pittsburgh, user at Philly — sort by Philly (user wins).
       render(
-        <HomeParkList
-          parks={PARKS}
-          userLocation={PHILLY}
-          mapCenter={{ lat: 40.45, lng: -80.0 }}
-        />,
+        <HomeParkList parks={PARKS} userLocation={PHILLY} mapCenter={{ lat: 40.45, lng: -80.0 }} />,
       );
       const items = screen.getAllByRole("listitem");
       expect(items[0]?.textContent).toContain("9th and Poplar");
@@ -200,9 +240,7 @@ describe("HomeParkList", () => {
 
   describe("CMT-2: filter + sort compose", () => {
     it("filter narrows the set; userLocation sorts within it", () => {
-      const { container } = render(
-        <HomeParkList parks={PARKS} userLocation={PHILLY} />,
-      );
+      const { container } = render(<HomeParkList parks={PARKS} userLocation={PHILLY} />);
       const filterInput = container.querySelector("input[type='search']") as HTMLInputElement;
       fireEvent.change(filterInput, { target: { value: "philadelphia" } });
       const items = screen.getAllByRole("listitem");
@@ -307,9 +345,9 @@ describe("HomeParkList", () => {
       expect(screen.getByTestId("bbox-empty")).toBeInTheDocument();
 
       rerender(<HomeParkList parks={PARKS} />);
-      expect((screen.getByPlaceholderText(/filter by name or city/i) as HTMLInputElement).value).toBe(
-        "FDR",
-      );
+      expect(
+        (screen.getByPlaceholderText(/filter by name or city/i) as HTMLInputElement).value,
+      ).toBe("FDR");
     });
   });
 

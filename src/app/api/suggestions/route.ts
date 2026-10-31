@@ -58,10 +58,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
 
   // HONEYPOT — silent 200, no insert. Bots that filled the field never know.
-  if (
-    typeof body.referralSource === "string" &&
-    body.referralSource.trim().length > 0
-  ) {
+  if (typeof body.referralSource === "string" && body.referralSource.trim().length > 0) {
     return NextResponse.json({ ok: true });
   }
 
@@ -73,10 +70,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   const changeDescription =
     typeof body.changeDescription === "string" ? body.changeDescription.trim() : "";
   if (changeDescription.length === 0) {
-    return NextResponse.json(
-      { error: "missing_change_description" },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: "missing_change_description" }, { status: 400 });
   }
   if (changeDescription.length > MAX_DESCRIPTION_CHARS) {
     return NextResponse.json(

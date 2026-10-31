@@ -19,7 +19,10 @@ describe("Breadcrumb", () => {
 
   it("by default, renders ancestors as links and the last entry as aria-current", () => {
     render(<Breadcrumb trail={[TRAIL[0], TRAIL[1]]} />);
-    expect(screen.getByRole("link", { name: /pennsylvania skateparks/i })).toHaveAttribute("href", "/");
+    expect(screen.getByRole("link", { name: /pennsylvania skateparks/i })).toHaveAttribute(
+      "href",
+      "/",
+    );
     expect(screen.queryByRole("link", { name: /bucks county/i })).toBeNull();
     const current = screen.getByText(/bucks county/i);
     expect(current).toHaveAttribute("aria-current", "page");
@@ -27,8 +30,14 @@ describe("Breadcrumb", () => {
 
   it("with hideCurrent, drops the last entry from visible UI", () => {
     render(<Breadcrumb trail={TRAIL} hideCurrent />);
-    expect(screen.getByRole("link", { name: /pennsylvania skateparks/i })).toHaveAttribute("href", "/");
-    expect(screen.getByRole("link", { name: /bucks county/i })).toHaveAttribute("href", "/county/bucks");
+    expect(screen.getByRole("link", { name: /pennsylvania skateparks/i })).toHaveAttribute(
+      "href",
+      "/",
+    );
+    expect(screen.getByRole("link", { name: /bucks county/i })).toHaveAttribute(
+      "href",
+      "/county/bucks",
+    );
     expect(screen.queryByText(/9th and poplar/i)).toBeNull();
     expect(screen.queryByText((_, el) => el?.getAttribute("aria-current") === "page")).toBeNull();
   });

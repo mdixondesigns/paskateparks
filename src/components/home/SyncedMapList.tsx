@@ -139,6 +139,8 @@ export function SyncedMapList({ parks }: Props) {
 
   useEffect(() => {
     const desktopMql = window.matchMedia(`(min-width: ${DESKTOP_MIN_PX}px)`);
+    // Intentional post-hydration correction of the SSR defaults above.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsDesktop(desktopMql.matches);
     const onDesktopChange = (e: MediaQueryListEvent) => setIsDesktop(e.matches);
     desktopMql.addEventListener("change", onDesktopChange);
@@ -400,8 +402,7 @@ export function SyncedMapList({ parks }: Props) {
   // Only show the persistent chip when PARTIALLY filtered — the bbox-empty
   // override above already renders its own "See all parks" action, so
   // showing both at once would duplicate the affordance.
-  const showSeeAllChip =
-    visibleParks.length > 0 && visibleParks.length < coordParks.length;
+  const showSeeAllChip = visibleParks.length > 0 && visibleParks.length < coordParks.length;
 
   return (
     <div className="lg:grid lg:h-full lg:grid-cols-[2fr_3fr] lg:gap-0">
@@ -426,8 +427,8 @@ export function SyncedMapList({ parks }: Props) {
       <div
         className={
           mobileMapOpen
-            ? "fixed inset-0 z-[2000] lg:relative lg:inset-auto lg:z-auto lg:sticky lg:top-0 lg:h-full"
-            : "relative hidden lg:block lg:sticky lg:top-0 lg:h-full"
+            ? "fixed inset-0 z-[2000] lg:relative lg:sticky lg:inset-auto lg:top-0 lg:z-auto lg:h-full"
+            : "relative hidden lg:sticky lg:top-0 lg:block lg:h-full"
         }
       >
         {shouldMountMap ? (
@@ -447,7 +448,7 @@ export function SyncedMapList({ parks }: Props) {
             type="button"
             onClick={handleCloseMobileMap}
             aria-label="Close map"
-            className="absolute right-3 top-3 z-[2001] flex h-10 w-10 items-center justify-center rounded-full border bg-white text-lg font-bold shadow lg:hidden"
+            className="absolute top-3 right-3 z-[2001] flex h-10 w-10 items-center justify-center rounded-full border bg-white text-lg font-bold shadow lg:hidden"
           >
             ×
           </button>

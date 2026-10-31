@@ -6,10 +6,7 @@ import { JsonLd } from "@/components/seo/JsonLd";
 import { NearbyCard, type NearbyCardItem } from "@/components/park/NearbyCard";
 import { COUNTIES, assertCountiesInData, countyForSlug } from "@/lib/counties";
 import { HOME_BREADCRUMB, itemListJsonLd } from "@/lib/json-ld";
-import {
-  getCountiesWithOpenParks,
-  getParksByCounty,
-} from "@/lib/park-query";
+import { getCountiesWithOpenParks, getParksByCounty } from "@/lib/park-query";
 import { SITE_URL } from "@/lib/site";
 
 interface PageProps {
@@ -38,9 +35,7 @@ export async function generateStaticParams() {
   assertCountiesInData(counties);
   const params: { slug: string }[] = [];
   for (const displayName of counties) {
-    const county = COUNTIES.find(
-      (c) => c.displayName.toLowerCase() === displayName.toLowerCase(),
-    );
+    const county = COUNTIES.find((c) => c.displayName.toLowerCase() === displayName.toLowerCase());
     // assertCountiesInData above already throws on unknowns, so this find
     // should always succeed. Defensive check to keep the return shape clean.
     if (county) params.push({ slug: county.slug });
@@ -106,13 +101,10 @@ export default async function CountyArchivePage({ params }: PageProps) {
       <JsonLd data={itemList} />
       <Breadcrumb trail={breadcrumbTrail} />
 
-      <h1 className="mt-4 text-2xl font-bold">
-        Skateparks in {county.displayName} County, PA
-      </h1>
+      <h1 className="mt-4 text-2xl font-bold">Skateparks in {county.displayName} County, PA</h1>
 
       <p className="mt-2 text-sm">
-        {count} {noun} in {county.displayName} County, Pennsylvania, sorted
-        alphabetically.
+        {count} {noun} in {county.displayName} County, Pennsylvania, sorted alphabetically.
       </p>
 
       <ul role="list" className="mt-4 border-y">

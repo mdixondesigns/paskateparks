@@ -17,8 +17,7 @@ export function haversineMiles(a: LatLng, b: LatLng): number {
   const lat2 = toRad(b.lat);
   const sinDLat = Math.sin(dLat / 2);
   const sinDLng = Math.sin(dLng / 2);
-  const aHav =
-    sinDLat * sinDLat + Math.cos(lat1) * Math.cos(lat2) * sinDLng * sinDLng;
+  const aHav = sinDLat * sinDLat + Math.cos(lat1) * Math.cos(lat2) * sinDLng * sinDLng;
   const c = 2 * Math.atan2(Math.sqrt(aHav), Math.sqrt(1 - aHav));
   return EARTH_RADIUS_MILES * c;
 }
