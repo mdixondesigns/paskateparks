@@ -1,0 +1,56 @@
+# CI — the objective gate for every PR (human- or agent-authored).
+#
+# Runs lint, typecheck, and unit tests. A red check here means "not ready",
+# regardless of what anyone (or any agent) says about the change.
+#
+# Deliberately NOT here yet:
+#   • `pnpm build` / `pnpm test:e2e` — the build reads parks from Supabase at
+#     build time, and the only Supabase project today is production. Vercel
+#     builds every push anyway. Add these once a separate dev project exists
+#     so CI never holds production credentials.
+#   • `pnpm format:check` — ~96 files predate Prettier enforcement. Add after
+#     a one-time `pnpm format` commit.
+#
+# Runs on Linux, so files have LF endings. (Locally on Windows with
+# core.autocrlf=true, src/lib/park-query.test.ts fails on CRLF — not a bug.)
+
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      # Version comes from package.json's packageManager field.
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Unit tests
+        run: pnpm test

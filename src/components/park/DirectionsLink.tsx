@@ -30,6 +30,9 @@ export function DirectionsLink({ parkName, lat, lng, fullAddress }: Props) {
 
   useEffect(() => {
     if (/iPhone/.test(navigator.userAgent)) {
+      // Intentional post-hydration swap (see comment above) — the one extra
+      // render is the point, not a cascade.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setHref(appleMapsUrl(parkName, lat, lng));
     }
   }, [parkName, lat, lng]);

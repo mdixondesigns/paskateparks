@@ -139,6 +139,8 @@ export function SyncedMapList({ parks }: Props) {
 
   useEffect(() => {
     const desktopMql = window.matchMedia(`(min-width: ${DESKTOP_MIN_PX}px)`);
+    // Intentional post-hydration correction of the SSR defaults above.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsDesktop(desktopMql.matches);
     const onDesktopChange = (e: MediaQueryListEvent) => setIsDesktop(e.matches);
     desktopMql.addEventListener("change", onDesktopChange);
