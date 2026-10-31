@@ -15,10 +15,13 @@
 # Required GitHub Actions secrets (set via repo Settings → Secrets and variables → Actions):
 #   • SUPABASE_HOST_DEV               — e.g. djhuxetdljryleztkdrp.supabase.co
 #   • SUPABASE_PUBLISHABLE_KEY_DEV    — the sb_publishable_… key from .env.local
-#   • SUPABASE_HOST_PROD              — same shape, populated during phase 10 launch
-#   • SUPABASE_PUBLISHABLE_KEY_PROD   — same, phase 10
 #
-# Failure mode: if either ping fails (DB really down, key rotated, etc.), the
+# The *_DEV names are historical: the project labeled "paskateparks-dev"
+# (ref djhuxetdljryleztkdrp) IS production — the live site runs on it. No
+# separate prod project was ever created, so the old ping-prod job (which
+# only ever skipped with a warning) was removed 2026-10.
+#
+# Failure mode: if the ping fails (DB really down, key rotated, etc.), the
 # workflow run goes red and GitHub emails the repo owner. That's the alerting
 # mechanism — no separate monitoring needed.
 #
@@ -50,17 +53,17 @@ jobs:
             "repos/${{ github.repository }}/actions/workflows/supabase-keepalive.yml/enable"
           echo "✓ workflow re-enabled"
 
-  ping-dev:
+  ping-supabase:
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
-      - name: Ping dev Supabase
+      - name: Ping Supabase
         env:
           HOST: ${{ secrets.SUPABASE_HOST_DEV }}
           KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY_DEV }}
         run: |
           if [ -z "$HOST" ] || [ -z "$KEY" ]; then
-            echo "::warning::Missing SUPABASE_HOST_DEV or SUPABASE_PUBLISHABLE_KEY_DEV — skipping dev ping. Configure via repo Settings → Secrets and variables → Actions."
+            echo "::warning::Missing SUPABASE_HOST_DEV or SUPABASE_PUBLISHABLE_KEY_DEV — skipping ping. Configure via repo Settings → Secrets and variables → Actions."
             exit 0
           fi
           # --max-time 30 covers the 10-30s resume-from-pause window.
@@ -70,24 +73,4 @@ jobs:
             -H "apikey: $KEY" \
             -H "Accept: application/json"
           echo ""
-          echo "✓ dev keepalive OK"
-
-  ping-prod:
-    runs-on: ubuntu-latest
-    timeout-minutes: 2
-    steps:
-      - name: Ping prod Supabase
-        env:
-          HOST: ${{ secrets.SUPABASE_HOST_PROD }}
-          KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY_PROD }}
-        run: |
-          if [ -z "$HOST" ] || [ -z "$KEY" ]; then
-            echo "::warning::Missing SUPABASE_HOST_PROD or SUPABASE_PUBLISHABLE_KEY_PROD — skipping prod ping. (Expected pre-launch; configure during phase 10 cutover.)"
-            exit 0
-          fi
-          curl --fail --silent --show-error --max-time 30 \
-            "https://$HOST/rest/v1/parks?select=id&limit=1" \
-            -H "apikey: $KEY" \
-            -H "Accept: application/json"
-          echo ""
-          echo "✓ prod keepalive OK"
+          echo "✓ keepalive OK"
