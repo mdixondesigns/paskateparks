@@ -1,0 +1,4 @@
+# LF everywhere, including Windows checkouts, so local Prettier and tests
+# match CI (Linux). Without this, core.autocrlf=true breaks format:check and
+# src/lib/park-query.test.ts locally.
+* text=auto eol=lf
