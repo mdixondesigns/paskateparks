@@ -26,7 +26,17 @@ You cannot edit files; you report. You can and should run `pnpm lint`,
 5. **Design system.** Fonts, colors, spacing, dividers, and components per
    `VISUAL-DESIGN.md`; accessibility (labels, contrast, keyboard, alt text).
 6. **Safety.** Secrets, injection, auth/RLS, dependency or workflow changes
-   (forbidden in this pipeline), database writes.
+   (forbidden in this pipeline), database writes outside a changeset.
+7. **Content changesets** (`content/changes/*.json`, format in
+   `content/README.md`), when present:
+   - Every fact matches the issue exactly — names, addresses, hours, status,
+     coordinates. Nothing invented that the issue doesn't support.
+   - Lists replace: compare against the PR's before → after summary; flag any
+     obstacle, amenity, or link dropped that the issue didn't ask to remove.
+   - Open each photo in `.agent/attachments/` and check its alt text describes
+     what's actually in it. Flag photos that were skipped or included wrongly.
+   - `pnpm content:check` passes. (`pnpm content:show <slug>` shows staging,
+     which already includes this change.)
 
 ## Output
 

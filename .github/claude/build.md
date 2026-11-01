@@ -28,11 +28,43 @@ independent reviewer will check your work afterwards, then the owner.
    (assumptions, anything the owner should look at in the Vercel preview), and
    a final line `Closes #<issue number>`.
 
+## Content changes (parks, photos)
+
+Park content lives in the database and changes only through a changeset file.
+Read `content/README.md` first — it is the format reference.
+
+1. **Existing park?** Run `pnpm content:show <slug>` and start from its output.
+   Lists (obstacles, surfaces, amenities, links) replace the whole list, so
+   copy the current list and change it. Never drop an item the issue didn't
+   ask to remove.
+2. **Photos** from the issue are in `.agent/attachments/`. Look at each one
+   with the Read tool. Skip anything that isn't a photo of the park and say
+   so in the PR. Upload the rest, in the issue's order:
+   `pnpm content:photo <slug> <issue-number> <files…>`. If a file is HEIC or
+   fails to process, stop and ask for JPEGs (blocked).
+3. **Alt text** — write it from what you actually see, for someone who can't:
+   the features and setting ("Deep concrete bowl with pool coping, trees
+   behind the fence"), not "Photo of a skatepark". 10–25 words. **Credit**
+   only if the issue names one; otherwise omit it.
+4. **Descriptions** are HTML paragraphs (`<p>…</p>`), like existing parks.
+   Write only what the issue supports; don't invent history or details.
+5. Write `content/changes/NNNN-<slug>.json` (NNNN = issue number, padded to
+   4 digits). One file per issue; edit it rather than adding a second.
+6. `pnpm content:check`, then `pnpm content:apply content/changes/<file>` —
+   this writes to **staging** so the Vercel preview shows the change. Apply
+   **before** pushing (the preview builds from staging on push).
+7. A new park in a county missing from `src/lib/counties.ts` needs that file
+   updated too (`content:check` tells you).
+8. In the PR body, add a **Content** section: each park, what changed
+   (before → after for edits, from `content:show`), the photos with their alt
+   text, and the preview URL path to check (`/park/<slug>`).
+
 ## Never
 
 - Edit `.github/workflows/`, `.env*` files, or anything holding secrets.
 - Add, remove, or upgrade dependencies (`package.json` deps, lockfile).
-- Write to any database or run `db:*` scripts. Writing a new migration file
+- Write data any way other than `pnpm content:photo` / `pnpm content:apply`
+  (both staging-only), or run `db:*` scripts. Writing a new migration file
   under `supabase/migrations/` is fine when the issue needs a schema change —
   say so prominently in the PR body; the owner applies it.
 - Weaken or delete tests to make them pass.

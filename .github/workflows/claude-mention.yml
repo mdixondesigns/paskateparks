@@ -51,6 +51,19 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      # Staging only, for content PRs (content:photo / content:apply).
+      - name: Staging credentials
+        env:
+          STAGING_DIRECT_URL: ${{ secrets.STAGING_DIRECT_URL }}
+          STAGING_SUPABASE_URL: ${{ secrets.STAGING_SUPABASE_URL }}
+          STAGING_SECRET_KEY: ${{ secrets.STAGING_SECRET_KEY }}
+        run: |
+          {
+            echo "DIRECT_URL=$STAGING_DIRECT_URL"
+            echo "NEXT_PUBLIC_SUPABASE_URL=$STAGING_SUPABASE_URL"
+            echo "SUPABASE_SECRET_KEY=$STAGING_SECRET_KEY"
+          } > .env.local
+
       - uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
@@ -59,5 +72,5 @@ jobs:
           claude_args: |
             --model sonnet
             --max-turns 60
-            --append-system-prompt "Follow CLAUDE.md. For UI work follow VISUAL-DESIGN.md. Before committing, run pnpm lint, pnpm format, pnpm typecheck and pnpm test and make them pass. Never add dependencies, edit .env files, or touch any database."
-            --allowedTools "Read,Write,Edit,Glob,Grep,Bash(pnpm lint),Bash(pnpm format),Bash(pnpm format:check),Bash(pnpm typecheck),Bash(pnpm test),Bash(pnpm exec vitest:*),Bash(git status),Bash(git diff:*),Bash(git log:*),Bash(git add:*),Bash(git commit:*),Bash(git push:*)"
+            --append-system-prompt "Follow CLAUDE.md. For UI work follow VISUAL-DESIGN.md. Before committing, run pnpm lint, pnpm format, pnpm typecheck and pnpm test and make them pass. Never add dependencies or edit .env files. Park content changes go through content/changes/*.json per content/README.md: after editing a changeset, run pnpm content:check and pnpm content:apply <file> (staging only) before pushing. Never write to any database another way."
+            --allowedTools "Read,Write,Edit,Glob,Grep,Bash(pnpm lint),Bash(pnpm format),Bash(pnpm format:check),Bash(pnpm typecheck),Bash(pnpm test),Bash(pnpm exec vitest:*),Bash(git status),Bash(git diff:*),Bash(git log:*),Bash(git add:*),Bash(git commit:*),Bash(git push:*),Bash(ls:*),Bash(pnpm content:check:*),Bash(pnpm content:show:*),Bash(pnpm content:apply:*),Bash(pnpm content:photo:*)"

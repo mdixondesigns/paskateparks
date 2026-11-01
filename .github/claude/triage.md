@@ -27,8 +27,17 @@ Choose **ask** when any of these is true:
   saying so explicitly.
 - It needs something this pipeline is not allowed to do: edit
   `.github/workflows/`, add or upgrade dependencies, change secrets or env
-  vars, or write to any database. Say exactly what the owner would need to do
-  or approve.
+  vars, or change data other than through a content changeset. Say exactly
+  what the owner would need to do or approve.
+
+**Content issues** (a new park, edits to a park, photos) are supported — see
+`content/README.md`. Ask when you can't get the facts right without guessing:
+a new park needs at least its name, city, and a location precise enough for
+the map (address or coordinates); photos must be attached; and anything the
+issue states vaguely ("open in summer") that the site shows precisely. Don't
+ask for alt text or photo credit — the builder drafts alt text, and credit is
+left blank unless the issue names a photographer. List what the
+attachments are (`.agent/issue.md` → "Downloaded attachments") in the plan.
 
 ## Output
 
