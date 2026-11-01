@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 
 interface Props {
   parkName: string;
@@ -22,20 +22,17 @@ function appleMapsUrl(parkName: string, lat: number, lng: number): string {
 
 // Google Maps by default (matches the P0 "parent on Android in a parking
 // lot" case and works everywhere with zero JS). iPhones get swapped to
-// Apple Maps after mount — their native maps app, and the one most iPhone
-// users expect "Get directions" to open. Starting from the Google href on
-// both server and initial client render avoids a hydration mismatch.
-export function DirectionsLink({ parkName, lat, lng, fullAddress }: Props) {
-  const [href, setHref] = useState(() => googleMapsUrl(lat, lng));
+// Apple Maps after hydration — their native maps app, and the one most iPhone
+// users expect "Get directions" to open. useSyncExternalStore uses the server
+// snapshot (false → Google) for SSR and the hydration render, then React
+// re-renders with the real user agent, so there is no hydration mismatch.
+const subscribeNoop = () => () => {};
+const getIsIPhone = () => /iPhone/.test(navigator.userAgent);
+const getIsIPhoneServer = () => false;
 
-  useEffect(() => {
-    if (/iPhone/.test(navigator.userAgent)) {
-      // Intentional post-hydration swap (see comment above) — the one extra
-      // render is the point, not a cascade.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setHref(appleMapsUrl(parkName, lat, lng));
-    }
-  }, [parkName, lat, lng]);
+export function DirectionsLink({ parkName, lat, lng, fullAddress }: Props) {
+  const isIPhone = useSyncExternalStore(subscribeNoop, getIsIPhone, getIsIPhoneServer);
+  const href = isIPhone ? appleMapsUrl(parkName, lat, lng) : googleMapsUrl(lat, lng);
 
   return (
     <a
