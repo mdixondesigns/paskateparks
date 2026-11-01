@@ -61,3 +61,6 @@ data/
 
 *storybook.log
 storybook-static
+
+# Claude agent scratch files (issue context, plans, review findings)
+.agent/

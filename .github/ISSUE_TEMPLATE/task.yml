@@ -1,0 +1,37 @@
+name: Task
+description: A change to the site. Add the `ai-ready` label when you want Claude to pick it up.
+body:
+  - type: textarea
+    id: goal
+    attributes:
+      label: Goal
+      description: What should change, and why? One or two sentences is fine.
+      placeholder: Park pages should show the riding surface photo next to the surface list.
+    validations:
+      required: true
+  - type: textarea
+    id: done
+    attributes:
+      label: Done when
+      description: A checklist the result must satisfy. The reviewer checks every item.
+      placeholder: |
+        - [ ] Photo appears to the right of the list on desktop, below it on mobile
+        - [ ] Parks without a photo look the same as today
+    validations:
+      required: true
+  - type: textarea
+    id: verify
+    attributes:
+      label: How to check it
+      description: Where to look in the Vercel preview — a page, a park, a screen size.
+      placeholder: Open /park/fdr on a phone-width window.
+  - type: textarea
+    id: out-of-scope
+    attributes:
+      label: Out of scope
+      description: Anything it should NOT touch.
+  - type: textarea
+    id: attachments
+    attributes:
+      label: Attachments
+      description: Drag photos, copy, or files here.
