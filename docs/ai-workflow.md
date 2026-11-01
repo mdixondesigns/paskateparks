@@ -10,12 +10,12 @@ Turn a GitHub issue into a reviewed pull request with Claude.
 3. Claude comments "On it" with a link to the run log, then either:
    - **asks questions** — the issue gets `needs-info`. Reply in a comment; your
      reply restarts it automatically.
-   - **builds** — branch `claude/issue-N`, a draft PR, and a Vercel preview.
+   - **builds** — branch `claude/issue-N`, a PR, and a Vercel preview.
 4. An **independent reviewer** (a separate Claude run that never saw the
    builder's reasoning) comments on the PR. If it asks for changes, the builder
    fixes them and a final review runs. Max two rounds.
-5. **Ready:** the PR is marked ready for review and you're requested as
-   reviewer — GitHub emails you. **Stuck:** it stays a draft and Claude
+5. **Ready:** you're requested as
+   reviewer — GitHub emails you. **Stuck:** no review request; instead Claude
    @-mentions you on the issue with what's left.
 6. You check the preview and merge. `main` is protected: CI must pass and
    every change goes through a PR.
