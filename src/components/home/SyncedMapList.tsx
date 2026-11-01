@@ -49,6 +49,7 @@ import { filterByBbox, type LatLngBoundsLike } from "@/lib/bbox-filter";
 import { hasCoords } from "@/lib/has-coords";
 import type { HomeParkRow, MapParkRow } from "@/lib/park-query";
 import { useMapUrlState } from "@/lib/use-map-url-state";
+import { useMediaQuery } from "@/lib/use-media-query";
 
 import { HomeFooter } from "./HomeFooter";
 import { HomeParkList } from "./HomeParkList";
@@ -131,30 +132,11 @@ export function SyncedMapList({ parks }: Props) {
 
   const [mobileMapOpen, setMobileMapOpen] = useState(false);
   const [mobileMapEverOpened, setMobileMapEverOpened] = useState(false);
-  const [isDesktop, setIsDesktop] = useState(true);
+  const isDesktop = useMediaQuery(`(min-width: ${DESKTOP_MIN_PX}px)`, true);
   // (hover: hover) gates the list-card hover sync — touch devices should
   // not fire popup-open on every tap (the tap is for navigation). Default
-  // true for SSR; the effect corrects after hydration on touch hardware.
-  const [hoverCapable, setHoverCapable] = useState(true);
-
-  useEffect(() => {
-    const desktopMql = window.matchMedia(`(min-width: ${DESKTOP_MIN_PX}px)`);
-    // Intentional post-hydration correction of the SSR defaults above.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setIsDesktop(desktopMql.matches);
-    const onDesktopChange = (e: MediaQueryListEvent) => setIsDesktop(e.matches);
-    desktopMql.addEventListener("change", onDesktopChange);
-
-    const hoverMql = window.matchMedia("(hover: hover)");
-    setHoverCapable(hoverMql.matches);
-    const onHoverChange = (e: MediaQueryListEvent) => setHoverCapable(e.matches);
-    hoverMql.addEventListener("change", onHoverChange);
-
-    return () => {
-      desktopMql.removeEventListener("change", onDesktopChange);
-      hoverMql.removeEventListener("change", onHoverChange);
-    };
-  }, []);
+  // true for SSR; React corrects after hydration on touch hardware.
+  const hoverCapable = useMediaQuery("(hover: hover)", true);
 
   // coordParks/visibleParks — restored 2026-07-06 (automatic bbox filter).
   // D7 (revised after ground-truth check against pnpm db:check-coords):
