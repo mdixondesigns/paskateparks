@@ -82,13 +82,21 @@ describe("DirectionsLink", () => {
     container.innerHTML = renderToString(<DirectionsLink {...PARK} />);
     document.body.appendChild(container);
 
-    await act(async () => {
-      hydrateRoot(container, <DirectionsLink {...PARK} />);
-    });
+    let root: ReturnType<typeof hydrateRoot> | undefined;
 
-    expect(errorSpy).not.toHaveBeenCalled();
-    const href = container.querySelector("a")?.getAttribute("href") ?? "";
-    expect(new URL(href).host).toBe("maps.apple.com");
-    container.remove();
+    try {
+      await act(async () => {
+        root = hydrateRoot(container, <DirectionsLink {...PARK} />);
+      });
+
+      expect(errorSpy).not.toHaveBeenCalled();
+      const href = container.querySelector("a")?.getAttribute("href") ?? "";
+      expect(new URL(href).host).toBe("maps.apple.com");
+    } finally {
+      await act(async () => {
+        root?.unmount();
+      });
+      container.remove();
+    }
   });
 });
