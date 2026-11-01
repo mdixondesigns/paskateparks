@@ -1,7 +1,8 @@
 # CI — the objective gate for every PR (human- or agent-authored).
 #
-# Runs lint, formatting, typecheck, and unit tests. A red check here means
-# "not ready", regardless of what anyone (or any agent) says about the change.
+# Runs lint, formatting, typecheck, unit tests, and content changeset
+# validation. A red check here means "not ready", regardless of what anyone
+# (or any agent) says about the change.
 #
 # Deliberately NOT here yet:
 #   • `pnpm build` / `pnpm test:e2e` — the build reads parks from Supabase at
@@ -52,3 +53,6 @@ jobs:
 
       - name: Unit tests
         run: pnpm test
+
+      - name: Content changesets
+        run: pnpm content:check

@@ -21,4 +21,5 @@ them, then push. A second (final) review follows.
    `git push`.
 
 The same "Never" rules as the build step apply: no workflow, `.env*`,
-dependency, or database changes, and never weaken tests to make them pass.
+dependency changes; data only via `pnpm content:apply` to staging (re-apply
+the changeset after editing it, before pushing); never weaken tests.

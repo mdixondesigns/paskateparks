@@ -84,6 +84,47 @@ jobs:
           ' > .agent/issue.md
           gh issue comment "$ISSUE" --body "🤖 On it — reading the issue. [Run log]($RUN_URL)"
 
+      # Photos/files dragged into the issue or its comments → .agent/attachments/NN.<ext>,
+      # in the order they appear. Listed at the end of .agent/issue.md.
+      - name: Download attachments
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p .agent/attachments
+          gh issue view "$ISSUE" --json body,comments --jq '[.body, .comments[].body] | join("\n")' \
+            | grep -oE 'https://github\.com/(user-attachments/assets|[^/" ]+/[^/" ]+/assets)/[A-Za-z0-9-]+' \
+            | awk '!seen[$0]++' > .agent/attachment-urls.txt || true
+          n=0
+          while read -r url; do
+            n=$((n + 1)); f=".agent/attachments/$(printf %02d "$n")"
+            if ! curl -sSLf -H "Authorization: Bearer $GH_TOKEN" -o "$f" "$url"; then
+              echo "::warning::Could not download $url"; continue
+            fi
+            case "$(file -b --mime-type "$f")" in
+              image/jpeg) ext=jpg ;; image/png) ext=png ;; image/webp) ext=webp ;;
+              image/heic|image/heif) ext=heic ;; *) ext=bin ;;
+            esac
+            mv "$f" "$f.$ext"
+            echo "- \`.agent/attachments/$(printf %02d "$n").$ext\` ← $url" >> .agent/attachments.md
+          done < .agent/attachment-urls.txt
+          if [ -s .agent/attachments.md ]; then
+            { echo; echo "## Downloaded attachments"; echo; cat .agent/attachments.md; } >> .agent/issue.md
+          fi
+
+      # Staging only — content:photo / content:apply write here. Production
+      # credentials never enter this job.
+      - name: Staging credentials
+        env:
+          STAGING_DIRECT_URL: ${{ secrets.STAGING_DIRECT_URL }}
+          STAGING_SUPABASE_URL: ${{ secrets.STAGING_SUPABASE_URL }}
+          STAGING_SECRET_KEY: ${{ secrets.STAGING_SECRET_KEY }}
+        run: |
+          {
+            echo "DIRECT_URL=$STAGING_DIRECT_URL"
+            echo "NEXT_PUBLIC_SUPABASE_URL=$STAGING_SUPABASE_URL"
+            echo "SUPABASE_SECRET_KEY=$STAGING_SECRET_KEY"
+          } > .env.local
+
       # ── Triage ────────────────────────────────────────────────────────────
       - name: Triage
         id: triage
@@ -150,7 +191,7 @@ jobs:
           claude_args: |
             --model sonnet
             --max-turns 80
-            --allowedTools "Read,Write,Edit,Glob,Grep,Bash(pnpm lint),Bash(pnpm format),Bash(pnpm format:check),Bash(pnpm typecheck),Bash(pnpm test),Bash(pnpm exec vitest:*),Bash(git status),Bash(git diff:*),Bash(git log:*),Bash(git add:*),Bash(git commit:*),Bash(git push:*),Bash(gh pr view:*),Bash(gh pr create:*)"
+            --allowedTools "Read,Write,Edit,Glob,Grep,Bash(pnpm lint),Bash(pnpm format),Bash(pnpm format:check),Bash(pnpm typecheck),Bash(pnpm test),Bash(pnpm exec vitest:*),Bash(git status),Bash(git diff:*),Bash(git log:*),Bash(git add:*),Bash(git commit:*),Bash(git push:*),Bash(gh pr view:*),Bash(gh pr create:*),Bash(ls:*),Bash(pnpm content:check:*),Bash(pnpm content:show:*),Bash(pnpm content:apply:*),Bash(pnpm content:photo:*)"
             --json-schema '{"type":"object","properties":{"blocked":{"type":"boolean"},"summary":{"type":"string"}},"required":["blocked","summary"]}'
 
       - name: Read build result
@@ -187,7 +228,7 @@ jobs:
           claude_args: |
             --model sonnet
             --max-turns 40
-            --allowedTools "Read,Glob,Grep,Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(pnpm lint),Bash(pnpm typecheck),Bash(pnpm test),Bash(pnpm exec vitest:*)"
+            --allowedTools "Read,Glob,Grep,Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(pnpm lint),Bash(pnpm typecheck),Bash(pnpm test),Bash(pnpm exec vitest:*),Bash(pnpm content:check:*),Bash(pnpm content:show:*)"
             --json-schema '{"type":"object","properties":{"verdict":{"type":"string","enum":["approve","changes"]},"findings":{"type":"string"}},"required":["verdict","findings"]}'
 
       - name: Post review 1
@@ -217,7 +258,7 @@ jobs:
           claude_args: |
             --model sonnet
             --max-turns 60
-            --allowedTools "Read,Write,Edit,Glob,Grep,Bash(pnpm lint),Bash(pnpm format),Bash(pnpm format:check),Bash(pnpm typecheck),Bash(pnpm test),Bash(pnpm exec vitest:*),Bash(git status),Bash(git diff:*),Bash(git log:*),Bash(git add:*),Bash(git commit:*),Bash(git push:*)"
+            --allowedTools "Read,Write,Edit,Glob,Grep,Bash(pnpm lint),Bash(pnpm format),Bash(pnpm format:check),Bash(pnpm typecheck),Bash(pnpm test),Bash(pnpm exec vitest:*),Bash(git status),Bash(git diff:*),Bash(git log:*),Bash(git add:*),Bash(git commit:*),Bash(git push:*),Bash(ls:*),Bash(pnpm content:check:*),Bash(pnpm content:show:*),Bash(pnpm content:apply:*),Bash(pnpm content:photo:*)"
 
       - name: Review (round 2)
         id: review2
@@ -232,7 +273,7 @@ jobs:
           claude_args: |
             --model sonnet
             --max-turns 40
-            --allowedTools "Read,Glob,Grep,Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(pnpm lint),Bash(pnpm typecheck),Bash(pnpm test),Bash(pnpm exec vitest:*)"
+            --allowedTools "Read,Glob,Grep,Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(pnpm lint),Bash(pnpm typecheck),Bash(pnpm test),Bash(pnpm exec vitest:*),Bash(pnpm content:check:*),Bash(pnpm content:show:*)"
             --json-schema '{"type":"object","properties":{"verdict":{"type":"string","enum":["approve","changes"]},"findings":{"type":"string"}},"required":["verdict","findings"]}'
 
       - name: Post review 2

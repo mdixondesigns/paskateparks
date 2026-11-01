@@ -1,0 +1,44 @@
+name: Park content
+description: Add a park, update a park's details, or add photos. Add the `ai-ready` label when you want Claude to pick it up.
+body:
+  - type: dropdown
+    id: kind
+    attributes:
+      label: What kind of change?
+      options:
+        - New park
+        - Update a park
+        - Add photos to a park
+    validations:
+      required: true
+  - type: input
+    id: park
+    attributes:
+      label: Park
+      description: Name, or a link to its page on paskateparks.com for an existing park.
+      placeholder: https://paskateparks.com/park/fdr
+    validations:
+      required: true
+  - type: textarea
+    id: details
+    attributes:
+      label: Details
+      description: |
+        Whatever's new or changing — only what you know. For a new park: city and address (or a map pin link),
+        county, hours, park type, obstacles, amenities (lights, bathrooms, water, parking), links (website, Instagram).
+        For a closure: temporary or permanent, and the expected reopen date if known.
+      placeholder: |
+        Address: 123 Example St, Allentown, PA 18101 (Lehigh County)
+        Hours: dawn to dusk. Lights until 10pm.
+        Concrete park — bowl, quarter pipes, hubba, manual pad.
+        Instagram: @allentownskatepark
+  - type: textarea
+    id: photos
+    attributes:
+      label: Photos
+      description: Drag photos here (JPEG or PNG — not HEIC). Photos appear on the site in this order; the first one is the map thumbnail for a new park.
+  - type: input
+    id: credit
+    attributes:
+      label: Photo credit
+      description: Who took the photos, if they should be credited. Leave blank for no credit.
