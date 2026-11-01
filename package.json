@@ -27,6 +27,7 @@
     "db:check-coords": "tsx scripts/check-park-coords.ts",
     "db:check-rls": "tsx scripts/db-check-rls.ts",
     "db:seed-fdr": "tsx scripts/db-seed-fdr.ts",
+    "db:clone-to-staging": "tsx scripts/clone-prod-to-staging.ts",
     "db:studio": "drizzle-kit studio",
     "migrate-wp": "tsx scripts/migrate-wp.ts",
     "migrate-wp:dry-run": "tsx scripts/migrate-wp.ts --dry-run",
