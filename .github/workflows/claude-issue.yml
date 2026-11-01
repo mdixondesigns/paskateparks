@@ -1,0 +1,286 @@
+# Issue → AI agent → PR. Opt-in: add the `ai-ready` label to an issue.
+#
+#   triage ──ask──► comments questions, adds `needs-info`; your reply re-runs this
+#     │
+#   build  ──► branch claude/issue-N, commits, pushes, opens a DRAFT PR
+#     │
+#   review ──► independent Claude run (fresh context) reviews the diff
+#     │ changes requested?
+#   fix    ──► builder addresses the review, pushes
+#     │
+#   review ──► second and final review
+#     │
+#   hand-off: checks green + approved → PR marked ready, review requested from
+#             @mdixondesigns (GitHub emails you). Otherwise stays draft with notes.
+#
+# Prompts live in .github/claude/*.md — edit those to tune behavior.
+# Claude steps decide; plain workflow steps act (comments, labels, ready/review)
+# using GITHUB_TOKEN. Claude's own pushes/PR use the Claude GitHub App token,
+# which is what lets CI run on its PRs.
+#
+# Cost guard: Claude runs bill against the CLAUDE_CODE_OAUTH_TOKEN subscription
+# (Pro). Max 5 Claude calls per run, each turn-capped, Sonnet throughout.
+
+name: Claude issue agent
+
+on:
+  issues:
+    types: [labeled]
+  issue_comment:
+    types: [created]
+
+concurrency:
+  group: claude-issue-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  agent:
+    # Only the repo owner can start or resume the agent. Comments only resume
+    # it while the issue is waiting on answers (`needs-info`).
+    if: >-
+      github.event.sender.login == 'mdixondesigns' &&
+      !github.event.issue.pull_request &&
+      (
+        (github.event_name == 'issues' && github.event.label.name == 'ai-ready') ||
+        (github.event_name == 'issue_comment' &&
+          contains(github.event.issue.labels.*.name, 'ai-ready') &&
+          contains(github.event.issue.labels.*.name, 'needs-info'))
+      )
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+      actions: read
+      id-token: write # Claude GitHub App auth
+    env:
+      ISSUE: ${{ github.event.issue.number }}
+      BRANCH: claude/issue-${{ github.event.issue.number }}
+      OWNER: mdixondesigns
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Gather issue context
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p .agent
+          gh issue view "$ISSUE" --json number,title,body,comments --jq '
+            "# Issue #\(.number): \(.title)\n\n\(.body // "")\n\n## Comments\n"
+            + ([.comments[] | "\n### @\(.author.login) (\(.createdAt))\n\n\(.body)\n"] | join(""))
+          ' > .agent/issue.md
+          gh issue comment "$ISSUE" --body "🤖 On it — reading the issue. [Run log]($RUN_URL)"
+
+      # ── Triage ────────────────────────────────────────────────────────────
+      - name: Triage
+        id: triage
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            Follow the instructions in .github/claude/triage.md.
+            The issue, with all comments so far, is in .agent/issue.md.
+          claude_args: |
+            --model sonnet
+            --max-turns 25
+            --allowedTools "Read,Glob,Grep"
+            --json-schema '{"type":"object","properties":{"decision":{"type":"string","enum":["build","ask"]},"questions":{"type":"string"},"plan":{"type":"string"}},"required":["decision","questions","plan"]}'
+
+      - name: Read triage result
+        id: t
+        env:
+          OUT: ${{ steps.triage.outputs.structured_output }}
+        run: |
+          [ -n "$OUT" ] || { echo "::error::Triage returned no result"; exit 1; }
+          jq -r '.questions' <<<"$OUT" > .agent/questions.md
+          jq -r '.plan' <<<"$OUT" > .agent/plan.md
+          echo "decision=$(jq -r '.decision' <<<"$OUT")" >> "$GITHUB_OUTPUT"
+
+      - name: Ask questions
+        if: steps.t.outputs.decision == 'ask'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          {
+            echo "🤖 Before I start, I need a few answers:"
+            echo
+            cat .agent/questions.md
+            echo
+            echo "_Reply in a comment and I'll pick it back up._"
+          } > .agent/comment.md
+          gh issue comment "$ISSUE" --body-file .agent/comment.md
+          gh issue edit "$ISSUE" --add-label needs-info
+
+      # ── Build ─────────────────────────────────────────────────────────────
+      - name: Prepare branch
+        if: steps.t.outputs.decision == 'build'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue edit "$ISSUE" --remove-label needs-info || true
+          if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null; then
+            git switch "$BRANCH"
+          else
+            git switch -c "$BRANCH"
+          fi
+
+      - name: Build
+        id: build
+        if: steps.t.outputs.decision == 'build'
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            Follow the instructions in .github/claude/build.md.
+            Issue #${{ env.ISSUE }} is in .agent/issue.md; the triage plan is in .agent/plan.md.
+            You are on branch ${{ env.BRANCH }}.
+          claude_args: |
+            --model sonnet
+            --max-turns 80
+            --allowedTools "Read,Write,Edit,Glob,Grep,Bash(pnpm lint),Bash(pnpm format),Bash(pnpm format:check),Bash(pnpm typecheck),Bash(pnpm test),Bash(pnpm exec vitest:*),Bash(git status),Bash(git diff:*),Bash(git log:*),Bash(git add:*),Bash(git commit:*),Bash(git push:*),Bash(gh pr view:*),Bash(gh pr create:*)"
+            --json-schema '{"type":"object","properties":{"blocked":{"type":"boolean"},"summary":{"type":"string"}},"required":["blocked","summary"]}'
+
+      - name: Read build result
+        id: b
+        if: steps.t.outputs.decision == 'build'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OUT: ${{ steps.build.outputs.structured_output }}
+        run: |
+          [ -n "$OUT" ] || { echo "::error::Build returned no result"; exit 1; }
+          jq -r '.summary' <<<"$OUT" > .agent/build-summary.md
+          echo "blocked=$(jq -r '.blocked' <<<"$OUT")" >> "$GITHUB_OUTPUT"
+          echo "pr=$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number // ""')" >> "$GITHUB_OUTPUT"
+
+      - name: Report blocked build
+        if: steps.b.outputs.blocked == 'true' || (steps.t.outputs.decision == 'build' && steps.b.outputs.pr == '')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          { echo "🤖 I couldn't finish this one:"; echo; cat .agent/build-summary.md; } > .agent/comment.md
+          gh issue comment "$ISSUE" --body-file .agent/comment.md
+          gh issue edit "$ISSUE" --add-label needs-info
+
+      # ── Review loop (max 2 rounds) ────────────────────────────────────────
+      - name: Review (round 1)
+        id: review1
+        if: steps.b.outputs.pr != '' && steps.b.outputs.blocked != 'true'
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            Follow the instructions in .github/claude/review.md.
+            Issue: .agent/issue.md. Review the changes on this branch versus origin/main (PR #${{ steps.b.outputs.pr }}).
+          claude_args: |
+            --model sonnet
+            --max-turns 40
+            --allowedTools "Read,Glob,Grep,Bash(git diff:*),Bash(git log:*),Bash(git show:*)"
+            --json-schema '{"type":"object","properties":{"verdict":{"type":"string","enum":["approve","changes"]},"findings":{"type":"string"}},"required":["verdict","findings"]}'
+
+      - name: Post review 1
+        id: r1
+        if: steps.review1.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OUT: ${{ steps.review1.outputs.structured_output }}
+          PR: ${{ steps.b.outputs.pr }}
+        run: |
+          [ -n "$OUT" ] || { echo "::error::Review returned no result"; exit 1; }
+          V=$(jq -r '.verdict' <<<"$OUT")
+          jq -r '.findings' <<<"$OUT" > .agent/review-1.md
+          { echo "### 🔍 Independent review — round 1: \`$V\`"; echo; cat .agent/review-1.md; } > .agent/comment.md
+          gh pr comment "$PR" --body-file .agent/comment.md
+          echo "verdict=$V" >> "$GITHUB_OUTPUT"
+
+      - name: Fix (round 1)
+        id: fix1
+        if: steps.r1.outputs.verdict == 'changes'
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            Follow the instructions in .github/claude/fix.md.
+            Issue: .agent/issue.md. Review findings: .agent/review-1.md. PR #${{ steps.b.outputs.pr }}, branch ${{ env.BRANCH }}.
+          claude_args: |
+            --model sonnet
+            --max-turns 60
+            --allowedTools "Read,Write,Edit,Glob,Grep,Bash(pnpm lint),Bash(pnpm format),Bash(pnpm format:check),Bash(pnpm typecheck),Bash(pnpm test),Bash(pnpm exec vitest:*),Bash(git status),Bash(git diff:*),Bash(git log:*),Bash(git add:*),Bash(git commit:*),Bash(git push:*)"
+
+      - name: Review (round 2)
+        id: review2
+        if: steps.fix1.outcome == 'success'
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            Follow the instructions in .github/claude/review.md. This is the FINAL round.
+            Issue: .agent/issue.md. The previous round's findings are in .agent/review-1.md — check each was resolved.
+            Review the changes on this branch versus origin/main (PR #${{ steps.b.outputs.pr }}).
+          claude_args: |
+            --model sonnet
+            --max-turns 40
+            --allowedTools "Read,Glob,Grep,Bash(git diff:*),Bash(git log:*),Bash(git show:*)"
+            --json-schema '{"type":"object","properties":{"verdict":{"type":"string","enum":["approve","changes"]},"findings":{"type":"string"}},"required":["verdict","findings"]}'
+
+      - name: Post review 2
+        id: r2
+        if: steps.review2.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OUT: ${{ steps.review2.outputs.structured_output }}
+          PR: ${{ steps.b.outputs.pr }}
+        run: |
+          [ -n "$OUT" ] || { echo "::error::Review returned no result"; exit 1; }
+          V=$(jq -r '.verdict' <<<"$OUT")
+          { echo "### 🔍 Independent review — round 2 (final): \`$V\`"; echo; jq -r '.findings' <<<"$OUT"; } > .agent/comment.md
+          gh pr comment "$PR" --body-file .agent/comment.md
+          echo "verdict=$V" >> "$GITHUB_OUTPUT"
+
+      # ── Hand-off ──────────────────────────────────────────────────────────
+      - name: Final checks
+        id: checks
+        if: steps.r1.outputs.verdict != ''
+        continue-on-error: true
+        run: |
+          pnpm lint
+          pnpm format:check
+          pnpm typecheck
+          pnpm test
+
+      - name: Hand off
+        if: steps.r1.outputs.verdict != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ steps.b.outputs.pr }}
+          VERDICT: ${{ steps.r2.outputs.verdict || steps.r1.outputs.verdict }}
+          CHECKS: ${{ steps.checks.outcome }}
+        run: |
+          PR_URL="${{ github.server_url }}/${{ github.repository }}/pull/$PR"
+          if [ "$VERDICT" = approve ] && [ "$CHECKS" = success ]; then
+            gh pr ready "$PR"
+            gh pr edit "$PR" --add-reviewer "$OWNER"
+            gh issue comment "$ISSUE" --body "🤖 Ready for your review: $PR_URL"
+          else
+            gh pr comment "$PR" --body "🤖 Stopping here and leaving this as a draft — final review: \`$VERDICT\`, checks: \`$CHECKS\`. See the review comments above for what's left."
+            gh issue comment "$ISSUE" --body "🤖 @$OWNER I got partway and need you: $PR_URL (left as draft — see its comments)."
+          fi
+
+      - name: Report failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue comment "$ISSUE" --body "🤖 @$OWNER Something went wrong on my side — see the [run log]($RUN_URL). Remove and re-add \`ai-ready\` to retry."
