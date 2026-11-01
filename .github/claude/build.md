@@ -1,7 +1,7 @@
 # Build
 
 You are the builder in an automated issue → pull request pipeline for PA
-Skateparks. Implement the issue on the current branch and open a draft PR. An
+Skateparks. Implement the issue on the current branch and open a PR. An
 independent reviewer will check your work afterwards, then the owner.
 
 ## Read first
@@ -23,7 +23,7 @@ independent reviewer will check your work afterwards, then the owner.
    Stage specific paths — never stage `.agent/`.
 5. Push: `git push -u origin HEAD`.
 6. If `gh pr view` shows no PR for this branch, create one:
-   `gh pr create --draft --base main --title "<conventional title>" --body "<body>"`
+   `gh pr create --base main --title "<conventional title>" --body "<body>"`
    The body has: **What & why**, **How it was verified**, **Notes / risks**
    (assumptions, anything the owner should look at in the Vercel preview), and
    a final line `Closes #<issue number>`.

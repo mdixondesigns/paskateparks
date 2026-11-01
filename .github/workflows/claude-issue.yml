@@ -2,7 +2,7 @@
 #
 #   triage ──ask──► comments questions, adds `needs-info`; your reply re-runs this
 #     │
-#   build  ──► branch claude/issue-N, commits, pushes, opens a DRAFT PR
+#   build  ──► branch claude/issue-N, commits, pushes, opens a PR
 #     │
 #   review ──► independent Claude run (fresh context) reviews the diff
 #     │ changes requested?
@@ -10,8 +10,8 @@
 #     │
 #   review ──► second and final review
 #     │
-#   hand-off: checks green + approved → PR marked ready, review requested from
-#             @mdixondesigns (GitHub emails you). Otherwise stays draft with notes.
+#   hand-off: checks green + approved → review requested from
+#             @mdixondesigns (GitHub emails you). Otherwise @-mentions you with notes.
 #
 # Prompts live in .github/claude/*.md — edit those to tune behavior.
 # Claude steps decide; plain workflow steps act (comments, labels, ready/review)
@@ -187,7 +187,7 @@ jobs:
           claude_args: |
             --model sonnet
             --max-turns 40
-            --allowedTools "Read,Glob,Grep,Bash(git diff:*),Bash(git log:*),Bash(git show:*)"
+            --allowedTools "Read,Glob,Grep,Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(pnpm lint),Bash(pnpm typecheck),Bash(pnpm test),Bash(pnpm exec vitest:*)"
             --json-schema '{"type":"object","properties":{"verdict":{"type":"string","enum":["approve","changes"]},"findings":{"type":"string"}},"required":["verdict","findings"]}'
 
       - name: Post review 1
@@ -232,7 +232,7 @@ jobs:
           claude_args: |
             --model sonnet
             --max-turns 40
-            --allowedTools "Read,Glob,Grep,Bash(git diff:*),Bash(git log:*),Bash(git show:*)"
+            --allowedTools "Read,Glob,Grep,Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(pnpm lint),Bash(pnpm typecheck),Bash(pnpm test),Bash(pnpm exec vitest:*)"
             --json-schema '{"type":"object","properties":{"verdict":{"type":"string","enum":["approve","changes"]},"findings":{"type":"string"}},"required":["verdict","findings"]}'
 
       - name: Post review 2
@@ -270,12 +270,15 @@ jobs:
         run: |
           PR_URL="${{ github.server_url }}/${{ github.repository }}/pull/$PR"
           if [ "$VERDICT" = approve ] && [ "$CHECKS" = success ]; then
-            gh pr ready "$PR"
-            gh pr edit "$PR" --add-reviewer "$OWNER"
+            # REST, not `gh pr edit --add-reviewer` / `gh pr ready`: those use
+            # GraphQL mutations GITHUB_TOKEN gets "Resource not accessible by
+            # integration" on (seen on #6). This request is what emails you.
+            gh api -X POST "repos/${{ github.repository }}/pulls/$PR/requested_reviewers" \
+              -f "reviewers[]=$OWNER" --silent
             gh issue comment "$ISSUE" --body "🤖 Ready for your review: $PR_URL"
           else
-            gh pr comment "$PR" --body "🤖 Stopping here and leaving this as a draft — final review: \`$VERDICT\`, checks: \`$CHECKS\`. See the review comments above for what's left."
-            gh issue comment "$ISSUE" --body "🤖 @$OWNER I got partway and need you: $PR_URL (left as draft — see its comments)."
+            gh pr comment "$PR" --body "🤖 Stopping here — final review: \`$VERDICT\`, checks: \`$CHECKS\`. See the review comments above for what's left. Don't merge as-is."
+            gh issue comment "$ISSUE" --body "🤖 @$OWNER I got partway and need you: $PR_URL (see its comments)."
           fi
 
       - name: Report failure
